@@ -2,7 +2,7 @@ name: Deploy p2pme-scan to Cloudflare Pages
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "apps/p2pme-scan/**"
       - ".github/workflows/deploy-p2pme-scan.yml"
