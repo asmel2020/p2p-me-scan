@@ -5,7 +5,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "chain-event-indexer"
+      "database_name": "chain-event-indexer",
+      "database_id": "0d553189-68dc-4c23-9818-59c290e20fad"
     }
   ]
 }
