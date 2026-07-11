@@ -20,7 +20,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
@@ -29,11 +29,12 @@ jobs:
         working-directory: apps/p2pme-scan
         run: pnpm build
 
+      - name: Install Wrangler
+        run: npm install -g wrangler@4
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy dist --project-name=p2pme-scan
-          preCommands: pnpm config set ignore-workspace-root-check true
-          wranglerVersion: "4"
