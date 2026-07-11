@@ -8,7 +8,9 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "indexer": "turbo run start --filter @chain-event-indexer",
-    "deploy:api": "turbo run deploy --filter p2p-api"
+    "deploy:api": "turbo run deploy --filter p2p-api",
+    "deploy:build": "turbo run build:worker --filter p2p-me-scanner",
+    "deploy:pages": "turbo run deploy:worker --filter p2p-me-scanner"
 
   },
   "devDependencies": {

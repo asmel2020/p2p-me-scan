@@ -86,7 +86,7 @@ importers:
         specifier: ^4.110.0
         version: 4.110.0(@cloudflare/workers-types@5.20260711.1)
 
-  apps/scan:
+  apps/p2pme-scanner:
     dependencies:
       next:
         specifier: 16.2.9
@@ -5817,7 +5817,7 @@ snapshots:
 
   '@types/node-fetch@2.6.13':
     dependencies:
-      '@types/node': 20.19.43
+      '@types/node': 26.1.1
       form-data: 4.0.6
 
   '@types/node@18.19.130':
