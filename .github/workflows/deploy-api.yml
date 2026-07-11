@@ -2,7 +2,7 @@ name: Deploy API
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "apps/p2p-api/**"
       - "packages/@p2p-me/db/**"
