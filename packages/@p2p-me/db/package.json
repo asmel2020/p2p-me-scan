@@ -1,0 +1,26 @@
+{
+  "name": "@p2p-me/db",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "check-types": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260711.1",
+    "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^5.9.2"
+  }
+}

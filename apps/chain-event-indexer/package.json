@@ -1,0 +1,28 @@
+{
+  "name": "@chain-event-indexer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "lint": "tsc --noEmit",
+    "check-types": "tsc --noEmit",
+    "db:generate": "pnpm --filter @p2p-me/db db:generate",
+    "db:migrate": "pnpm --filter @p2p-me/db db:migrate"
+  },
+  "dependencies": {
+    "@p2p-me/db": "workspace:*",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "uuid": "^14.0.1",
+    "viem": "^2.55.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260711.1",
+    "@types/node": "^26.1.1",
+    "@types/uuid": "^11.0.0",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.23.0"
+  }
+}

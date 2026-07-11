@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1783756221383,
+      "tag": "0000_secret_impossible_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1783757964198,
+      "tag": "0001_motionless_lightspeed",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783760406191,
+      "tag": "0002_safe_malcolm_colcord",
+      "breakpoints": true
+    }
+  ]
+}
