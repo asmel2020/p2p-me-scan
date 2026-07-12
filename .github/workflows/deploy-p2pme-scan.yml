@@ -28,6 +28,8 @@ jobs:
       - name: Build
         working-directory: apps/p2pme-scan
         run: pnpm build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
       - name: Install Wrangler
         run: npm install -g wrangler@4
