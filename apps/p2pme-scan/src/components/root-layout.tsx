@@ -1,14 +1,22 @@
 import { useState, type ReactNode } from 'react';
-import { Outlet, useNavigate } from '@tanstack/react-router';
+import { Outlet, useNavigate, useLocation } from '@tanstack/react-router';
+import { ExternalLink } from 'lucide-react';
 import { fetchOrder } from '@/features/orders/api/orders';
 import { OrderModal } from '@/features/orders/components/order-modal';
 import type { Order } from '@/features/orders/types';
+
+const navLinks = [
+  { to: '/', label: 'Orders' },
+  { to: '/analytics', label: 'Analytics' },
+];
 
 export function RootLayout({ children }: { children?: ReactNode }) {
   const [searchValue, setSearchValue] = useState('');
   const [searchedOrder, setSearchedOrder] = useState<Order | null>(null);
   const [searchError, setSearchError] = useState('');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSearch = async () => {
     const q = searchValue.trim();
@@ -46,6 +54,20 @@ export function RootLayout({ children }: { children?: ReactNode }) {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <style>{`
+        .rl-desktop-nav { display: flex; align-items: center; gap: 0.25rem; }
+        .rl-external-links { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+        .rl-hamburger { display: none; background: transparent; border: none; cursor: pointer; color: var(--color-foreground); padding: 0.5rem; }
+        .rl-search { flex: 1; max-width: 400px; position: relative; min-width: 0; }
+        .rl-mobile-menu { display: none; }
+        @media (max-width: 768px) {
+          .rl-desktop-nav { display: none; }
+          .rl-external-links { display: none; }
+          .rl-hamburger { display: block; }
+          .rl-search { max-width: none; }
+          .rl-mobile-menu { display: flex; }
+        }
+      `}</style>
       <header style={{
         borderBottom: '1px solid var(--color-border)',
         background: 'var(--color-card)',
@@ -53,7 +75,7 @@ export function RootLayout({ children }: { children?: ReactNode }) {
       }}>
         <div style={{
           maxWidth: 1200, margin: '0 auto', padding: '0 1.5rem',
-          height: 60, display: 'flex', alignItems: 'center', gap: '2rem',
+          height: 64, display: 'flex', alignItems: 'center', gap: '1rem',
         }}>
           <div
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', flexShrink: 0 }}
@@ -65,7 +87,25 @@ export function RootLayout({ children }: { children?: ReactNode }) {
             <span style={{ fontWeight: 700, fontSize: '1.125rem', color: 'var(--color-foreground)' }}>P2P.me Scan</span>
           </div>
 
-          <div style={{ flex: 1, maxWidth: 480, position: 'relative' }}>
+          <nav className="rl-desktop-nav">
+            {navLinks.map(link => (
+              <button
+                key={link.to}
+                onClick={() => { navigate({ to: link.to as '/' | '/analytics' }); setMobileMenuOpen(false); }}
+                style={{
+                  background: location.pathname === link.to ? 'var(--color-muted)' : 'transparent',
+                  border: 'none', cursor: 'pointer', padding: '0.375rem 0.75rem',
+                  borderRadius: 'var(--radius-md)', fontSize: '0.8125rem', fontWeight: 500,
+                  color: location.pathname === link.to ? 'var(--color-foreground)' : 'var(--color-muted-foreground)',
+                  transition: 'all 0.15s', whiteSpace: 'nowrap',
+                }}
+              >
+                {link.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="rl-search">
             <input
               type="text"
               placeholder="Search by Order ID..."
@@ -102,13 +142,121 @@ export function RootLayout({ children }: { children?: ReactNode }) {
             )}
           </div>
 
-          <span className="badge badge-success" style={{ flexShrink: 0 }}>Base Mainnet</span>
+          <div className="rl-external-links">
+            <a
+              href="https://p2p.me/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.25rem',
+                color: 'var(--color-muted-foreground)', textDecoration: 'none',
+                fontSize: '0.8125rem', fontWeight: 500, padding: '0.375rem 0.5rem',
+                borderRadius: 'var(--radius-md)', transition: 'all 0.15s',
+              }}
+            >
+              p2p.me
+              <ExternalLink size={12} />
+            </a>
+            <a
+              href="https://github.com/asmel2020/p2p-me-scan"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex', alignItems: 'center', color: 'var(--color-muted-foreground)',
+                transition: 'color 0.15s', padding: '0.375rem',
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            </a>
+          </div>
+
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="rl-hamburger"
+          >
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d={mobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
+            </svg>
+          </button>
         </div>
+
+        {mobileMenuOpen && (
+          <div className="rl-mobile-menu" style={{
+            borderTop: '1px solid var(--color-border)', padding: '0.75rem 1.5rem',
+            flexDirection: 'column', gap: '0.5rem',
+          }}>
+            {navLinks.map(link => (
+              <button
+                key={link.to}
+                onClick={() => { navigate({ to: link.to as '/' | '/analytics' }); setMobileMenuOpen(false); }}
+                style={{
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  padding: '0.5rem 0', fontSize: '0.9375rem', fontWeight: 500, textAlign: 'left',
+                  color: location.pathname === link.to ? 'var(--color-foreground)' : 'var(--color-muted-foreground)',
+                }}
+              >
+                {link.label}
+              </button>
+            ))}
+            <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '0.25rem 0' }} />
+            <a
+              href="https://p2p.me/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                color: 'var(--color-muted-foreground)', textDecoration: 'none',
+                padding: '0.5rem 0', fontSize: '0.9375rem', fontWeight: 500,
+              }}
+            >
+              p2p.me <ExternalLink size={14} />
+            </a>
+            <a
+              href="https://github.com/asmel2020/p2p-me-scan"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                color: 'var(--color-muted-foreground)', textDecoration: 'none',
+                padding: '0.5rem 0', fontSize: '0.9375rem', fontWeight: 500,
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg> GitHub
+            </a>
+          </div>
+        )}
       </header>
 
       <main style={{ flex: 1, maxWidth: 1200, margin: '0 auto', padding: '1.5rem', width: '100%', boxSizing: 'border-box' }}>
         {children ?? <Outlet />}
       </main>
+
+      <footer style={{
+        borderTop: '1px solid var(--color-border)',
+        background: 'var(--color-card)',
+        padding: '1.5rem',
+      }}>
+        <div style={{
+          maxWidth: 1200, margin: '0 auto', width: '100%', boxSizing: 'border-box',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem',
+          textAlign: 'center',
+        }}>
+          <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--color-muted-foreground)' }}>
+            Con amor para la comunidad de{' '}
+            <a
+              href="https://p2p.me/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'var(--color-primary)', textDecoration: 'none', fontWeight: 500 }}
+            >
+              p2p.me
+            </a>
+          </p>
+          <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--color-muted-foreground)' }}>
+            Built with ❤️ for the P2P.me community
+          </p>
+        </div>
+      </footer>
 
       {searchedOrder && (
         <OrderModal order={searchedOrder} onClose={handleCloseModal} />
