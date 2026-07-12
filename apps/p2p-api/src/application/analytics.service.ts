@@ -1,4 +1,4 @@
-import { and, sql, eq, gte, lte } from "drizzle-orm";
+import { and, sql, eq, ne, gte, lte } from "drizzle-orm";
 import { orders } from "@p2p-me/db";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import * as schema from "@p2p-me/db";
@@ -23,7 +23,9 @@ export async function getDailyTransferability(
   db: DB,
   query: GetDailyTransferabilityQuery,
 ): Promise<DailyTransferRow[]> {
-  const filters: ReturnType<typeof eq | typeof gte | typeof lte>[] = [];
+  const filters: ReturnType<typeof eq | typeof ne | typeof gte | typeof lte>[] = [];
+
+  filters.push(ne(orders.status, "cancelled"));
 
   if (query.fromDate) {
     filters.push(gte(sql`DATE(${orders.blockTimestamp})`, query.fromDate));
