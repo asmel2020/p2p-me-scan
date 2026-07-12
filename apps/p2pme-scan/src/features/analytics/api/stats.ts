@@ -1,3 +1,4 @@
+import apiClient from '@/api/client';
 import type { DailyTransfer } from '../types';
 
 const CURRENCIES = ['VEN', 'INR', 'IDR', 'BRL', 'ARS', 'MEX', 'EUR', 'NGN', 'USD', 'COP', 'ECU'];
@@ -39,13 +40,17 @@ function generateMockDailyData(days: number): DailyTransfer[] {
   return data;
 }
 
-const mockDailyTransfers = generateMockDailyData(30);
-
 export function getAvailableCurrencies(): string[] {
   return CURRENCIES;
 }
 
 export async function fetchDailyTransferability(): Promise<DailyTransfer[]> {
-  await new Promise((r) => setTimeout(r, 300));
-  return mockDailyTransfers;
+  try {
+    const { data } = await apiClient.get<DailyTransfer[]>('/analytics/daily-transferability');
+    if (data.length > 0) return data;
+    throw new Error("empty");
+  } catch {
+    await new Promise((r) => setTimeout(r, 300));
+    return generateMockDailyData(30);
+  }
 }
