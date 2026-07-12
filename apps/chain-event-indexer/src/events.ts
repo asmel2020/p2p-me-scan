@@ -178,6 +178,8 @@ export type ChainEvent = {
   orderType: string;
   currency: string;
   blockNumber: number;
+  blockTimestamp: string;
+  blockTimestampUnix: number;
   txHash: string;
   logIndex: number | null;
 };
@@ -250,6 +252,8 @@ function decodeLog(log: Log): ChainEvent | null {
   return {
     orderId,
     eventName,
+    blockTimestamp: "",
+    blockTimestampUnix: 0,
     user,
     merchant,
     recipientAddr,
@@ -270,16 +274,27 @@ function decodeLog(log: Log): ChainEvent | null {
 export async function fetchBlockEvents(
   blockNumber: bigint,
 ): Promise<ChainEvent[]> {
-  const logs = await publicClient.getLogs({
-    address: DIAMOND_ADDRESS as Address,
-    events: ORDER_EVENT_ABI,
-    fromBlock: blockNumber,
-    toBlock: blockNumber,
-  });
+  const [logs, block] = await Promise.all([
+    publicClient.getLogs({
+      address: DIAMOND_ADDRESS as Address,
+      events: ORDER_EVENT_ABI,
+      fromBlock: blockNumber,
+      toBlock: blockNumber,
+    }),
+    publicClient.getBlock({ blockNumber }),
+  ]);
+
+  const ts = Number(block.timestamp);
 
   return logs
-    .map((log: any) => decodeLog(log))
+    .map((log: any) => {
+      const e = decodeLog(log);
+      if (!e) return null;
+      e.blockTimestampUnix = ts;
+      e.blockTimestamp = new Date(ts * 1000).toISOString();
+      return e;
+    })
     .filter((e: any): e is ChainEvent => e !== null);
 }
 
-export { ORDER_EVENT_ABI, EVENT_NAMES, DIAMOND_ADDRESS, RPC_URL, publicClient };
+export { ORDER_EVENT_ABI, EVENT_NAMES, DIAMOND_ADDRESS, RPC_URL, publicClient, decodeLog };

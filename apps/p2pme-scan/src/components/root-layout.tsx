@@ -37,7 +37,8 @@ export function RootLayout({ children }: { children?: ReactNode }) {
         status: detail.status,
         createdBlock: detail.createdBlock,
         updatedBlock: detail.updatedBlock,
-        createdAt: detail.createdAt,
+        blockTimestamp: detail.blockTimestamp,
+        blockTimestampUnix: detail.blockTimestampUnix,
         updatedAt: detail.updatedAt,
       });
       setSearchError('');

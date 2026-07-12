@@ -34,6 +34,8 @@ export async function persistEvent(
       status,
       createdBlock: event.blockNumber,
       updatedBlock: event.blockNumber,
+      blockTimestamp: event.blockTimestamp,
+      blockTimestampUnix: event.blockTimestampUnix,
     })
     .onConflictDoUpdate({
       target: schema.orders.orderId,
@@ -47,24 +49,31 @@ export async function persistEvent(
         currency: event.currency,
         status,
         updatedBlock: event.blockNumber,
+        blockTimestamp: event.blockTimestamp,
+        blockTimestampUnix: event.blockTimestampUnix,
         updatedAt: sql`(CURRENT_TIMESTAMP)`,
       },
     });
 
-  await db.insert(schema.orderEvents).values({
-    id: uuidv4(),
-    orderId: event.orderId,
-    eventName: event.eventName,
-    user: event.user,
-    merchant: event.merchant,
-    recipientAddr: event.recipientAddr,
-    acceptedMerchant: event.acceptedMerchant,
-    usdc: event.usdc,
-    fiat: event.fiat,
-    orderType: event.orderType,
-    currency: event.currency,
-    blockNumber: event.blockNumber,
-    txHash: event.txHash,
-    logIndex: event.logIndex,
-  });
+  await db
+    .insert(schema.orderEvents)
+    .values({
+      id: uuidv4(),
+      orderId: event.orderId,
+      eventName: event.eventName,
+      user: event.user,
+      merchant: event.merchant,
+      recipientAddr: event.recipientAddr,
+      acceptedMerchant: event.acceptedMerchant,
+      usdc: event.usdc,
+      fiat: event.fiat,
+      orderType: event.orderType,
+      currency: event.currency,
+      blockNumber: event.blockNumber,
+      blockTimestamp: event.blockTimestamp,
+      blockTimestampUnix: event.blockTimestampUnix,
+      txHash: event.txHash,
+      logIndex: event.logIndex,
+    })
+    .onConflictDoNothing();
 }

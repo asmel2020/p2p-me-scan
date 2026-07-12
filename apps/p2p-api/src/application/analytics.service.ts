@@ -26,10 +26,10 @@ export async function getDailyTransferability(
   const filters: ReturnType<typeof eq | typeof gte | typeof lte>[] = [];
 
   if (query.fromDate) {
-    filters.push(gte(sql`DATE(${orders.createdAt})`, query.fromDate));
+    filters.push(gte(sql`DATE(${orders.blockTimestamp})`, query.fromDate));
   }
   if (query.toDate) {
-    filters.push(lte(sql`DATE(${orders.createdAt})`, query.toDate));
+    filters.push(lte(sql`DATE(${orders.blockTimestamp})`, query.toDate));
   }
   if (query.currency) {
     filters.push(eq(orders.currency, query.currency));
@@ -39,7 +39,7 @@ export async function getDailyTransferability(
 
   return db
     .select({
-      date: sql<string>`DATE(${orders.createdAt})`,
+      date: sql<string>`DATE(${orders.blockTimestamp})`,
       currency: orders.currency,
       usdcVolume: sql<number>`COALESCE(SUM(${orders.usdc}), 0)`,
       fiatVolume: sql<number>`COALESCE(SUM(${orders.fiat}), 0)`,
@@ -47,6 +47,6 @@ export async function getDailyTransferability(
     })
     .from(orders)
     .where(where)
-    .groupBy(sql`DATE(${orders.createdAt})`, orders.currency)
-    .orderBy(sql`DATE(${orders.createdAt})`, orders.currency);
+    .groupBy(sql`DATE(${orders.blockTimestamp})`, orders.currency)
+    .orderBy(sql`DATE(${orders.blockTimestamp})`, orders.currency);
 }

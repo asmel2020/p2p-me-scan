@@ -12,7 +12,8 @@ export interface Order {
   status: 'placed' | 'accepted' | 'paid' | 'completed' | 'cancelled';
   createdBlock: number;
   updatedBlock: number;
-  createdAt: string;
+  blockTimestamp: string;
+  blockTimestampUnix: number;
   updatedAt: string;
 }
 
@@ -29,9 +30,10 @@ export interface OrderEvent {
   orderType: string;
   currency: string;
   blockNumber: number;
+  blockTimestamp: string;
+  blockTimestampUnix: number;
   txHash: string;
   logIndex: number | null;
-  createdAt: string;
 }
 
 export interface OrderDetail extends Order {

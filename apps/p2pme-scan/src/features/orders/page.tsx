@@ -74,7 +74,8 @@ export function OrdersPage() {
             status: order.status,
             createdBlock: order.createdBlock,
             updatedBlock: order.updatedBlock,
-            createdAt: order.createdAt,
+            blockTimestamp: order.blockTimestamp,
+            blockTimestampUnix: order.blockTimestampUnix,
             updatedAt: order.updatedAt,
           });
         })

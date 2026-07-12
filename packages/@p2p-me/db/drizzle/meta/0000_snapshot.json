@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "3c7c4473-e008-4add-a321-44198ac83b13",
+  "id": "d95331d2-87f1-4fdc-8642-c769fa294051",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "order_events": {
@@ -98,6 +98,22 @@
           "notNull": true,
           "autoincrement": false
         },
+        "block_timestamp": {
+          "name": "block_timestamp",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "block_timestamp_unix": {
+          "name": "block_timestamp_unix",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
         "tx_hash": {
           "name": "tx_hash",
           "type": "text",
@@ -121,7 +137,24 @@
           "default": "(CURRENT_TIMESTAMP)"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_events_block_number_log_index": {
+          "name": "idx_events_block_number_log_index",
+          "columns": [
+            "block_number",
+            "log_index"
+          ],
+          "isUnique": false
+        },
+        "idx_events_tx_hash_log_index_unique": {
+          "name": "idx_events_tx_hash_log_index_unique",
+          "columns": [
+            "tx_hash",
+            "log_index"
+          ],
+          "isUnique": true
+        }
+      },
       "foreignKeys": {
         "order_events_order_id_orders_order_id_fk": {
           "name": "order_events_order_id_orders_order_id_fk",
@@ -243,6 +276,22 @@
           "notNull": true,
           "autoincrement": false
         },
+        "block_timestamp": {
+          "name": "block_timestamp",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "block_timestamp_unix": {
+          "name": "block_timestamp_unix",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -267,8 +316,64 @@
             "order_id"
           ],
           "isUnique": true
+        },
+        "idx_orders_status_updated_block": {
+          "name": "idx_orders_status_updated_block",
+          "columns": [
+            "status",
+            "updated_block"
+          ],
+          "isUnique": false
+        },
+        "idx_orders_currency_updated_block": {
+          "name": "idx_orders_currency_updated_block",
+          "columns": [
+            "currency",
+            "updated_block"
+          ],
+          "isUnique": false
+        },
+        "idx_orders_order_type_updated_block": {
+          "name": "idx_orders_order_type_updated_block",
+          "columns": [
+            "order_type",
+            "updated_block"
+          ],
+          "isUnique": false
         }
       },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "processor_state": {
+      "name": "processor_state",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_block": {
+          "name": "last_block",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CURRENT_TIMESTAMP)"
+        }
+      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

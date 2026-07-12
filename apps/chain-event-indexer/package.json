@@ -6,6 +6,8 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
+    "block-stats": "tsx src/block-stats.ts",
+    "scan": "tsx src/scan-blocks.ts",
     "lint": "tsc --noEmit",
     "check-types": "tsc --noEmit",
     "db:generate": "pnpm --filter @p2p-me/db db:generate",

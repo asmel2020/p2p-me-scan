@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 export const orders = sqliteTable("orders", {
@@ -15,6 +15,8 @@ export const orders = sqliteTable("orders", {
   status: text("status").notNull().default("placed"),
   createdBlock: integer("created_block").notNull(),
   updatedBlock: integer("updated_block").notNull(),
+  blockTimestamp: text("block_timestamp").notNull().default(""),
+  blockTimestampUnix: integer("block_timestamp_unix").notNull().default(0),
   createdAt: text("created_at")
     .default(sql`(CURRENT_TIMESTAMP)`)
     .notNull(),
@@ -45,6 +47,8 @@ export const orderEvents = sqliteTable("order_events", {
   orderType: text("order_type").notNull().default("-"),
   currency: text("currency").notNull().default("-"),
   blockNumber: integer("block_number").notNull(),
+  blockTimestamp: text("block_timestamp").notNull().default(""),
+  blockTimestampUnix: integer("block_timestamp_unix").notNull().default(0),
   txHash: text("tx_hash").notNull(),
   logIndex: integer("log_index"),
   createdAt: text("created_at")
@@ -53,6 +57,8 @@ export const orderEvents = sqliteTable("order_events", {
 }, (table) => ({
   blockNumberLogIndexIdx: index("idx_events_block_number_log_index")
     .on(table.blockNumber, table.logIndex),
+  txHashLogIndexUnique: uniqueIndex("idx_events_tx_hash_log_index_unique")
+    .on(table.txHash, table.logIndex),
 }));
 
 export const processorState = sqliteTable("processor_state", {
