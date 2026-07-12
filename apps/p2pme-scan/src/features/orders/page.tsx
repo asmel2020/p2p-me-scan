@@ -57,7 +57,7 @@ export function OrdersPage() {
     const id = initialOrderId.current;
     if (id) {
       initialOrderId.current = undefined;
-      navigate({ to: "/", search: { cursor, limit } as any, replace: true });
+      navigate({ to: "/", search: { cursor, limit }, replace: true });
       fetchOrder(id)
         .then((order) => {
           setSelectedOrder({
@@ -86,7 +86,7 @@ export function OrdersPage() {
     (newCursor: string | undefined) => {
       navigate({
         to: "/",
-        search: { cursor: newCursor, limit } as any,
+        search: { cursor: newCursor, limit },
         replace: false,
       });
     },
@@ -154,7 +154,7 @@ export function OrdersPage() {
     cursorHistory.current = [];
     navigate({
       to: "/",
-      search: { cursor: undefined, limit: n } as any,
+      search: { cursor: undefined, limit: n },
       replace: false,
     });
   };
