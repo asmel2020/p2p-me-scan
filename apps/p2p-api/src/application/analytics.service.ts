@@ -41,9 +41,9 @@ export async function getDailyTransferability(
     .select({
       date: sql<string>`DATE(${orders.blockTimestamp})`,
       currency: orders.currency,
-      usdcVolume: sql<number>`COALESCE(SUM(CASE WHEN ${orders.status} = 'completed' THEN ${orders.usdc} ELSE 0 END), 0)`,
-      fiatVolume: sql<number>`COALESCE(SUM(CASE WHEN ${orders.status} = 'completed' THEN ${orders.fiat} ELSE 0 END), 0)`,
-      completedCount: sql<number>`COALESCE(SUM(CASE WHEN ${orders.status} = 'completed' THEN 1 ELSE 0 END), 0)`,
+      usdcVolume: sql<number>`COALESCE(SUM(${orders.usdc}), 0)`,
+      fiatVolume: sql<number>`COALESCE(SUM(${orders.fiat}), 0)`,
+      completedCount: sql<number>`COALESCE(COUNT(*), 0)`,
     })
     .from(orders)
     .where(where)
