@@ -5,7 +5,10 @@ import {
   getAvailableCurrencies,
 } from "./hooks/useDailyTransferability";
 import { TransferabilityChart } from "./components/transferability-chart";
-import { RangeFilterModal, type RangeMode } from "./components/range-filter-modal";
+import {
+  RangeFilterModal,
+  type RangeMode,
+} from "./components/range-filter-modal";
 import type { DailyTransfer } from "./types";
 
 const currencies = getAvailableCurrencies();
@@ -84,20 +87,17 @@ function aggregate(
     return filtered.sort((a, b) => a.date.localeCompare(b.date));
   }
 
-  const getKey = rangeMode === "weekly" ? getWeekId
-    : rangeMode === "monthly" ? getMonthId
-    : getYearId;
+  const getKey =
+    rangeMode === "weekly"
+      ? getWeekId
+      : rangeMode === "monthly"
+        ? getMonthId
+        : getYearId;
 
-  const labelFn = (key: string) => {
-    if (rangeMode === "weekly") return key;
-    if (rangeMode === "monthly") {
-      const d = new Date(key + "-01");
-      return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
-    }
-    return key;
-  };
-
-  const map = new Map<string, { usdcVolume: number; completedCount: number; fiatVolume: number }>();
+  const map = new Map<
+    string,
+    { usdcVolume: number; completedCount: number; fiatVolume: number }
+  >();
   for (const d of filtered) {
     const key = getKey(d.date);
     const existing = map.get(key);
@@ -182,7 +182,13 @@ export function AnalyticsPage() {
   }, [data, currencyFilter]);
 
   const filtered = useMemo(
-    () => aggregate(currencyFiltered, rangeMode, fromDate || undefined, toDate || undefined),
+    () =>
+      aggregate(
+        currencyFiltered,
+        rangeMode,
+        fromDate || undefined,
+        toDate || undefined,
+      ),
     [currencyFiltered, rangeMode, fromDate, toDate],
   );
 
@@ -197,7 +203,14 @@ export function AnalyticsPage() {
       (best, d) => (d.usdcVolume > best.usdcVolume ? d : best),
       filtered[0],
     );
-    return { totalVolume, totalFiat, totalCompleted, avgVolume, bestDay, periods };
+    return {
+      totalVolume,
+      totalFiat,
+      totalCompleted,
+      avgVolume,
+      bestDay,
+      periods,
+    };
   }, [filtered]);
 
   const rangeLabel = rangeMode.charAt(0).toUpperCase() + rangeMode.slice(1);
