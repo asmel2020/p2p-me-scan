@@ -16,7 +16,9 @@ interface Props {
 function formatDateLabel(dateStr: string): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     return new Date(dateStr).toLocaleDateString("en-US", {
-      month: "short", day: "numeric", year: "numeric",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
     });
   }
   if (/^\d{4}-W\d{2}$/.test(dateStr)) {
@@ -51,20 +53,21 @@ function toChartTime(dateStr: string): string | number {
 export function TransferabilityChart({ data, isLoading }: Props) {
   const [tooltip, setTooltip] = useState<DailyTransfer | null>(null);
   const chartTimeToData = useRef(new Map<string | number, DailyTransfer>());
-  chartTimeToData.current = new Map(
-    data.map((d) => [toChartTime(d.date), d]),
-  );
+  chartTimeToData.current = new Map(data.map((d) => [toChartTime(d.date), d]));
 
-  const handleCrosshairMove = useCallback((param: {
-    time?: string | number;
-    point?: { x: number; y: number } | null;
-  }) => {
-    if (!param.time || !param.point) {
-      setTooltip(null);
-      return;
-    }
-    setTooltip(chartTimeToData.current.get(param.time) ?? null);
-  }, []);
+  const handleCrosshairMove = useCallback(
+    (param: {
+      time?: string | number;
+      point?: { x: number; y: number } | null;
+    }) => {
+      if (!param.time || !param.point) {
+        setTooltip(null);
+        return;
+      }
+      setTooltip(chartTimeToData.current.get(param.time) ?? null);
+    },
+    [],
+  );
 
   if (isLoading) {
     return (
@@ -100,14 +103,17 @@ export function TransferabilityChart({ data, isLoading }: Props) {
     );
   }
 
-  const lineData = data.map((d) => ({ time: toChartTime(d.date), value: d.usdcVolume }));
+  const lineData = data.map((d) => ({
+    time: toChartTime(d.date),
+    value: d.usdcVolume,
+  }));
   const chartKey = data.length > 0 ? data[0].date.replace(/\d/g, "X") : "empty";
 
   return (
     <div style={{ position: "relative", width: "100%", height: 400 }}>
       <Chart
         key={chartKey}
-        onCrosshairMove={handleCrosshairMove}
+        onCrosshairMove={handleCrosshairMove as any}
         containerProps={{ style: { width: "100%", height: "100%" } }}
         options={{
           height: 400,
@@ -154,7 +160,9 @@ export function TransferabilityChart({ data, isLoading }: Props) {
                 type: "custom",
                 minMove: 1,
                 formatter: (price: number) =>
-                  price >= 1000 ? `${(price / 1000).toFixed(1)}k` : String(price),
+                  price >= 1000
+                    ? `${(price / 1000).toFixed(1)}k`
+                    : String(price),
               },
             }}
           />
