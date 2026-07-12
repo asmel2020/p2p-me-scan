@@ -58,12 +58,8 @@ async function main() {
   poller.onBlock(async (blockNumber) => {
     const events = await fetchBlockEvents(blockNumber);
     if (events.length > 0) {
-      console.log(`[Bloque ${blockNumber}] ${events.length} evento(s):`);
       for (const e of events) {
         await persistEvent(db, e);
-        console.log(
-          `  • ${e.eventName} | orderId: ${e.orderId} | user: ${e.user} | merchant: ${e.merchant} | recipient: ${e.recipientAddr} | usdc: ${e.usdc} | moneda: ${e.currency} ✓ guardado`,
-        );
       }
     }
     await setLastBlock(db, blockNumber);
