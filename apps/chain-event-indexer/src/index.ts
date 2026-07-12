@@ -53,7 +53,7 @@ async function main() {
     console.log(`Sin estado guardado. Iniciando desde bloque ${startBlock}`);
   }
 
-  const poller = startBlockPoller(3000, startBlock);
+  const poller = startBlockPoller(6000, startBlock);
 
   poller.onBlock(async (blockNumber) => {
     const events = await fetchBlockEvents(blockNumber);

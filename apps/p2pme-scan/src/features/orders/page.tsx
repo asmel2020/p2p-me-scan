@@ -15,6 +15,13 @@ import {
 } from "@/components/ui/select";
 import { RootLayout } from "@/components/root-layout";
 import { DatePickerWithRange } from "@/components/date-picker-with-range";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
 import type { Order } from "./types";
 
 function FilterGroup({
@@ -364,9 +371,52 @@ export function OrdersPage() {
           </Select>
         </FilterGroup>
 
-        <FilterGroup label="Date">
-          <DatePickerWithRange onApply={handleDateRangeChange} />
-        </FilterGroup>
+        <Dialog>
+          <DialogTrigger
+            style={{
+              background: "var(--color-muted)",
+              color: "var(--color-foreground)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-lg)",
+              padding: "0.25rem 0.5rem",
+              fontSize: "0.8125rem",
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.375rem",
+              lineHeight: 1.4,
+              alignSelf: "flex-end",
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <path d="M16 2v4M8 2v4M3 10h18" />
+            </svg>
+            {dateRange
+              ? `${dateRange.from.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${dateRange.to.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+              : "Range Filter"}
+          </DialogTrigger>
+          <DialogContent style={{ maxWidth: 320 }}>
+            <DialogTitle>Filter by Date Range</DialogTitle>
+            <DialogClose />
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                marginTop: "0.5rem",
+              }}
+            >
+              <DatePickerWithRange onApply={handleDateRangeChange} />
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div
