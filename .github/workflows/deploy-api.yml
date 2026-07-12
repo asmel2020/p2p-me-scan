@@ -23,7 +23,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install
-      - run: pnpm build
+      - run: pnpm build --filter p2p-api
 
       - name: Deploy Worker
         run: npx wrangler deploy
