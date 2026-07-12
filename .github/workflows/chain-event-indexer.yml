@@ -1,7 +1,7 @@
 name: Build and Deploy Chain Event Indexers
 
 on:
-  pull_request:
+  push:
     branches: [master]
     paths:
       - 'apps/chain-event-indexer/**'
