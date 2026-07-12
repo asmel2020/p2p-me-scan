@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { count, sql } from "drizzle-orm";
 import { initDB } from "@p2p-me/db/client";
-import { orders, orderEvents } from "@p2p-me/db";
+import { orders } from "@p2p-me/db";
 
 const app = new Hono<{ Bindings: { DB: D1Database } }>();
 
@@ -11,10 +11,6 @@ app.get("/", async (c) => {
   const [orderCount] = await db
     .select({ total: count() })
     .from(orders);
-
-  const [eventCount] = await db
-    .select({ total: count() })
-    .from(orderEvents);
 
   const statusCounts = await db
     .select({ status: orders.status, total: count() })
@@ -33,7 +29,6 @@ app.get("/", async (c) => {
 
   return c.json({
     orders: orderCount.total,
-    events: eventCount.total,
     byStatus: statusCounts,
     byCurrency: currencyTotals,
   });

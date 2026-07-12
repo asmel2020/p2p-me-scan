@@ -47,7 +47,6 @@ export interface PaginatedResponse<T> {
 
 export interface StatsResponse {
   orders: number;
-  events: number;
   byStatus: { status: string; total: number }[];
   byCurrency: { currency: string; totalUsdc: number; totalFiat: number; count: number }[];
 }

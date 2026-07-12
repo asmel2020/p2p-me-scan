@@ -237,20 +237,6 @@ export function OrdersPage() {
               marginBottom: "0.25rem",
             }}
           >
-            Total Events
-          </div>
-          <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>
-            {stats?.events.toLocaleString() ?? "—"}
-          </div>
-        </div>
-        <div className="stat-card">
-          <div
-            style={{
-              fontSize: "0.75rem",
-              color: "var(--color-muted-foreground)",
-              marginBottom: "0.25rem",
-            }}
-          >
             USDC Volume
           </div>
           <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>
