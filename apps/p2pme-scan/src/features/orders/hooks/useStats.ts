@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchStats } from '../api/stats';
+import type { StatsQueryParams } from '../types';
 
-export function useStats() {
+export function useStats(params?: StatsQueryParams) {
   return useQuery({
-    queryKey: ['stats'],
-    queryFn: fetchStats,
+    queryKey: ['stats', params],
+    queryFn: () => fetchStats(params),
     refetchInterval: 10_000,
   });
 }

@@ -141,7 +141,12 @@ export function OrdersPage() {
   const hasNext = !!nextCursor;
   const currentPage = cursorHistory.current.length + 1;
 
-  const { data: stats } = useStats();
+  const { data: stats } = useStats({
+    ...(currencyFilter ? { currency: currencyFilter } : {}),
+    ...(dateRange
+      ? { fromDate: toLocalDateStr(dateRange.from), toDate: toLocalDateStr(dateRange.to) }
+      : {}),
+  });
   const totalUsdc =
     stats?.byCurrency.reduce((sum, c) => sum + c.totalUsdc, 0) ?? 0;
 

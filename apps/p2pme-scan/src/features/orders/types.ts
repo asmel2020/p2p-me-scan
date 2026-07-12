@@ -61,6 +61,12 @@ export interface OrderQueryParams {
   toDate?: string;
 }
 
+export interface StatsQueryParams {
+  fromDate?: string;
+  toDate?: string;
+  currency?: string;
+}
+
 export interface EventQueryParams {
   cursor?: string;
   limit?: number;
