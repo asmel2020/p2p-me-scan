@@ -29,7 +29,7 @@ if (
 
 const RPC_URLS = ["https://mainnet.base.org", "https://8453.rpc.thirdweb.com"];
 
-const START_BLOCK = 43103682n;
+const START_BLOCK = 43103682n; //40218126n; //43103682n;
 const CHUNK_SIZE = 800n;
 const CONCURRENCY = 20;
 
@@ -42,14 +42,17 @@ function createClient(url: string) {
 
 const clients = RPC_URLS.map(createClient);
 
+const failedBlocks: bigint[] = [];
+
 async function processChunk(
   fromBlock: bigint,
   toBlock: bigint,
   clientIndex: number,
   db: any,
-  retries = 3,
 ): Promise<{ count: number; firstBlock: bigint | null }> {
-  for (let attempt = 0; attempt <= retries; attempt++) {
+  const MAX_RETRIES = 5;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const logs = await clients[clientIndex].getLogs({
         address: "0x4cad6eC90e65baBec9335cAd728DDC610c316368" as any,
@@ -70,13 +73,18 @@ async function processChunk(
         decodedEvents.push(decoded);
       }
 
-      const uniqueBlocks = [...new Set(decodedEvents.map((e) => BigInt(e.blockNumber)))];
+      const uniqueBlocks = [
+        ...new Set(decodedEvents.map((e) => BigInt(e.blockNumber))),
+      ];
       const blockTimestamps = new Map<string, number>();
       const blocks = await Promise.all(
-        uniqueBlocks.map((bn) => clients[clientIndex].getBlock({ blockNumber: bn })),
+        uniqueBlocks.map((bn) =>
+          clients[clientIndex].getBlock({ blockNumber: bn }).catch(() => null),
+        ),
       );
       for (const block of blocks) {
-        blockTimestamps.set(block.number.toString(), Number(block.timestamp));
+        if (block)
+          blockTimestamps.set(block.number.toString(), Number(block.timestamp));
       }
       for (const e of decodedEvents) {
         const ts = blockTimestamps.get(e.blockNumber.toString()) ?? 0;
@@ -94,22 +102,57 @@ async function processChunk(
       const isSizeLimit =
         err.message?.includes("Log response size exceeded") ||
         err.message?.includes("exceeds defined limit");
+
       if (isSizeLimit) {
         const mid = (fromBlock + toBlock) / 2n;
-        const left = await processChunk(fromBlock, mid, clientIndex, db);
-        const right = await processChunk(mid + 1n, toBlock, clientIndex, db);
-        const firstBlock = left.firstBlock ?? right.firstBlock;
-        return { count: left.count + right.count, firstBlock };
+        const otherIdx = (clientIndex + 1) % RPC_URLS.length;
+        const [left, right] = await Promise.all([
+          processChunk(fromBlock, mid, otherIdx, db),
+          processChunk(mid + 1n, toBlock, otherIdx, db),
+        ]);
+        return {
+          count: left.count + right.count,
+          firstBlock: left.firstBlock ?? right.firstBlock,
+        };
       }
-      if (isRateLimit && attempt < 2) {
-        const wait = Math.pow(2, attempt) * 1000;
+
+      if (isRateLimit && attempt < MAX_RETRIES) {
+        const wait = Math.pow(2, attempt) * 1000 + Math.random() * 2000;
         await new Promise((r) => setTimeout(r, wait));
         continue;
       }
-      return { count: 0, firstBlock: null };
+
+      if (fromBlock === toBlock) {
+        const errMsg = err.message ?? "unknown error";
+        console.error(`  BLOQUE IRRECUPERABLE ${fromBlock}: ${errMsg}`);
+        failedBlocks.push(fromBlock);
+        return { count: 0, firstBlock: null };
+      }
+
+      const mid = (fromBlock + toBlock) / 2n;
+      const otherIdx = (clientIndex + 1) % RPC_URLS.length;
+      const [left, right] = await Promise.all([
+        processChunk(fromBlock, mid, otherIdx, db),
+        processChunk(mid + 1n, toBlock, otherIdx, db),
+      ]);
+      return {
+        count: left.count + right.count,
+        firstBlock: left.firstBlock ?? right.firstBlock,
+      };
     }
   }
   return { count: 0, firstBlock: null };
+}
+
+async function getBlockNumberWithRetry(): Promise<bigint> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      return await clients[0].getBlockNumber();
+    } catch {
+      await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 1000));
+    }
+  }
+  return await clients[0].getBlockNumber();
 }
 
 async function main() {
@@ -119,7 +162,7 @@ async function main() {
     CLOUDFLARE_API_TOKEN!,
   );
 
-  const currentBlock = await clients[0].getBlockNumber();
+  const currentBlock = await getBlockNumberWithRetry();
   console.log(
     `Escaneando bloques ${START_BLOCK} → ${currentBlock} (${currentBlock - START_BLOCK} bloques)`,
   );
@@ -145,7 +188,9 @@ async function main() {
     const batch = chunks.slice(i, i + CONCURRENCY);
     const results = await Promise.all(
       batch.map((chunk, idx) =>
-        processChunk(chunk.from, chunk.to, idx % RPC_URLS.length, db),
+        new Promise((resolve) => setTimeout(resolve, idx * 100)).then(() =>
+          processChunk(chunk.from, chunk.to, idx % RPC_URLS.length, db),
+        ),
       ),
     );
     const batchEvents = results.reduce((a, b) => a + b.count, 0);
@@ -159,8 +204,6 @@ async function main() {
       }
     }
     processedChunks += batch.length;
-
-
 
     const elapsed = (Date.now() - startTime) / 1000;
     const pct = ((processedChunks / chunks.length) * 100).toFixed(1);
@@ -190,6 +233,27 @@ async function main() {
     );
   } else {
     console.log(`No se encontraron eventos en el rango`);
+  }
+
+  if (failedBlocks.length > 0) {
+    const failedFile = path.resolve(process.cwd(), "failed-blocks.json");
+    fs.writeFileSync(
+      failedFile,
+      JSON.stringify(
+        {
+          failedBlocks: failedBlocks.map((b) => b.toString()),
+          total: failedBlocks.length,
+          timestamp: new Date().toISOString(),
+        },
+        null,
+        2,
+      ),
+    );
+    console.error(
+      `\n BLOQUES IRRECUPERABLES (${failedBlocks.length}) guardados en ${failedFile}`,
+    );
+  } else {
+    console.log(`\nTodos los bloques se procesaron sin perdida de datos`);
   }
 }
 
