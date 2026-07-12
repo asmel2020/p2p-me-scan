@@ -1,0 +1,10 @@
+.git
+**/dist
+**/node_modules
+**/.turbo
+.env
+.env.local
+*.md
+.pnpm-debug.log*
+.gitkeep
+data
