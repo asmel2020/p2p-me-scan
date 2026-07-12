@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { count, sql } from "drizzle-orm";
+import { count, not, eq, sql } from "drizzle-orm";
 import { initDB } from "@p2p-me/db/client";
 import { orders } from "@p2p-me/db";
 
@@ -25,6 +25,7 @@ app.get("/", async (c) => {
       count: count(),
     })
     .from(orders)
+    .where(not(eq(orders.status, "cancelled")))
     .groupBy(orders.currency);
 
   return c.json({
