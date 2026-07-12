@@ -48,5 +48,6 @@ export async function getDailyTransferability(
     .from(orders)
     .where(where)
     .groupBy(sql`DATE(${orders.blockTimestamp})`, orders.currency)
+    .having(sql`SUM(CASE WHEN ${orders.status} = 'completed' THEN 1 ELSE 0 END) > 0`)
     .orderBy(sql`DATE(${orders.blockTimestamp})`, orders.currency);
 }
