@@ -83,7 +83,7 @@ export function OrderTimeline({ events }: OrderTimelineProps) {
               </div>
               {event && (
                 <div style={{ fontSize: '0.6875rem', color: 'var(--color-muted-foreground)', marginTop: '0.125rem' }}>
-                  Block <a href={`https://basescan.org/block/${event.blockNumber}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>{event.blockNumber}</a>
+                  {new Date(event.createdAt.replace(" ", "T") + "Z").toLocaleString()}
                   {' · '}
                   <a href={`https://basescan.org/tx/${event.txHash}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'none', fontFamily: 'monospace' }}>
                     {event.txHash.slice(0, 12)}...

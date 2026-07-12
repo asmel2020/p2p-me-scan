@@ -17,13 +17,20 @@ const currencyBase: Record<string, { usdc: number; fiat: number }> = {
   ECU: { usdc: 12000, fiat: 12000 },
 };
 
+function toLocalDateStr(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function generateMockDailyData(days: number): DailyTransfer[] {
   const data: DailyTransfer[] = [];
   const now = new Date();
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().slice(0, 10);
+    const dateStr = toLocalDateStr(date);
     for (const currency of CURRENCIES) {
       const base = currencyBase[currency] ?? { usdc: 30000, fiat: 30000 };
       const usdc = base.usdc + Math.random() * 20000;

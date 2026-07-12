@@ -13,9 +13,15 @@ interface Props {
   isLoading?: boolean;
 }
 
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d = "1"] = dateStr.split("-");
+  return new Date(Number(y), Number(m) - 1, Number(d));
+}
+
 function formatDateLabel(dateStr: string): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    return new Date(dateStr).toLocaleDateString("en-US", {
+    const d = parseLocalDate(dateStr);
+    return d.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -26,7 +32,7 @@ function formatDateLabel(dateStr: string): string {
     return `Week ${week}, ${dateStr.slice(0, 4)}`;
   }
   if (/^\d{4}-\d{2}$/.test(dateStr)) {
-    const d = new Date(dateStr + "-01");
+    const d = parseLocalDate(dateStr);
     return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
   }
   if (/^\d{4}$/.test(dateStr)) return dateStr;
@@ -42,10 +48,10 @@ function toChartTime(dateStr: string): string | number {
     return Math.floor(jan1.getTime() / 1000) + days * 86400;
   }
   if (/^\d{4}-\d{2}$/.test(dateStr)) {
-    return Math.floor(new Date(dateStr + "-01").getTime() / 1000);
+    return Math.floor(parseLocalDate(dateStr).getTime() / 1000);
   }
   if (/^\d{4}$/.test(dateStr)) {
-    return Math.floor(new Date(dateStr + "-01-01").getTime() / 1000);
+    return Math.floor(parseLocalDate(dateStr).getTime() / 1000);
   }
   return dateStr;
 }

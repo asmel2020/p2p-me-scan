@@ -51,8 +51,13 @@ function StatCard({
   );
 }
 
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 function getWeekId(dateStr: string): string {
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
   const year = d.getFullYear();
   const jan1 = new Date(year, 0, 1);
   const days = Math.floor((d.getTime() - jan1.getTime()) / 86400000);
@@ -132,6 +137,13 @@ export function AnalyticsPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
+  function toLocalDateStr(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
   const handleRangeModeChange = (mode: RangeMode) => {
     setRangeMode(mode);
     if (mode === "daily") {
@@ -139,19 +151,19 @@ export function AnalyticsPage() {
       setToDate("");
     } else {
       const today = new Date();
-      const to = today.toISOString().slice(0, 10);
+      const to = toLocalDateStr(today);
       const from = new Date(today);
       if (mode === "weekly") from.setDate(from.getDate() - 7);
       else if (mode === "monthly") from.setDate(from.getDate() - 30);
       else from.setDate(from.getDate() - 365);
-      setFromDate(from.toISOString().slice(0, 10));
+      setFromDate(toLocalDateStr(from));
       setToDate(to);
     }
   };
 
   const handleApplyCustomRange = (from: Date, to: Date) => {
-    setFromDate(from.toISOString().slice(0, 10));
-    setToDate(to.toISOString().slice(0, 10));
+    setFromDate(toLocalDateStr(from));
+    setToDate(toLocalDateStr(to));
     setRangeMode("daily");
   };
 
@@ -270,7 +282,7 @@ export function AnalyticsPage() {
           <StatCard
             label="Best Period"
             value={stats.bestDay.usdcVolume.toLocaleString()}
-            subtitle={stats.bestDay.date}
+            subtitle={parseLocalDate(stats.bestDay.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
           />
         </div>
       )}

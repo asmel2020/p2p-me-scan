@@ -9,6 +9,10 @@ import {
 import { Badge } from '@/components/ui/badge';
 import type { Order } from '../types';
 
+function formatLocal(iso: string) {
+  return new Date(iso.replace(" ", "T") + "Z").toLocaleString();
+}
+
 interface OrderModalProps {
   order: Order | null;
   onClose: () => void;
@@ -192,8 +196,8 @@ export function OrderModal({ order, onClose }: OrderModalProps) {
           <DetailRow label="Accepted Merchant" value={order.acceptedMerchant} mono href={order.acceptedMerchant !== '-' ? `https://basescan.org/address/${order.acceptedMerchant}` : undefined} />
           <DetailRow label="Created Block" value={`#${order.createdBlock}`} href={`https://basescan.org/block/${order.createdBlock}`} />
           <DetailRow label="Updated Block" value={`#${order.updatedBlock}`} href={`https://basescan.org/block/${order.updatedBlock}`} />
-          <DetailRow label="Created At" value={order.createdAt} />
-          <DetailRow label="Updated At" value={order.updatedAt} />
+          <DetailRow label="Created At" value={formatLocal(order.createdAt)} />
+          <DetailRow label="Updated At" value={formatLocal(order.updatedAt)} />
         </div>
 
         <h3 style={{
