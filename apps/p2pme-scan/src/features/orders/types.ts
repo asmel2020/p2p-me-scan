@@ -57,6 +57,8 @@ export interface OrderQueryParams {
   status?: string;
   currency?: string;
   orderType?: string;
+  fromDate?: string;
+  toDate?: string;
 }
 
 export interface EventQueryParams {

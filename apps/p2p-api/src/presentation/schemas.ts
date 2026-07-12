@@ -9,6 +9,8 @@ export const orderQuerySchema = cursorPaginationSchema.extend({
   status: z.enum(["placed", "accepted", "paid", "completed", "cancelled"]).optional(),
   currency: z.string().max(10).optional(),
   orderType: z.enum(["BUY", "SELL", "RENT"]).optional(),
+  fromDate: z.string().optional(),
+  toDate: z.string().optional(),
 });
 
 export const eventQuerySchema = cursorPaginationSchema.extend({

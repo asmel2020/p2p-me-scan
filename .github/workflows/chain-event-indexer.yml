@@ -1,4 +1,4 @@
-name: Build and Deploy Chain Event Indexers
+name: Build and Deploy Chain Event Indexer
 
 on:
   push:

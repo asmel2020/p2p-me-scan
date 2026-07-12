@@ -14,6 +14,7 @@ import {
   SelectIcon,
 } from "@/components/ui/select";
 import { RootLayout } from "@/components/root-layout";
+import { DatePickerWithRange } from "@/components/date-picker-with-range";
 import type { Order } from "./types";
 
 function FilterGroup({
@@ -48,6 +49,7 @@ export function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [currencyFilter, setCurrencyFilter] = useState("");
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(null);
   const cursorHistory = useRef<string[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
 
@@ -94,12 +96,22 @@ export function OrdersPage() {
     [navigate, limit],
   );
 
+  function toLocalDateStr(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
   const queryParams = {
     limit,
     cursor: cursor || undefined,
     ...(statusFilter ? { status: statusFilter } : {}),
     ...(typeFilter ? { orderType: typeFilter } : {}),
     ...(currencyFilter ? { currency: currencyFilter } : {}),
+    ...(dateRange
+      ? { fromDate: toLocalDateStr(dateRange.from), toDate: toLocalDateStr(dateRange.to) }
+      : {}),
   };
 
   const { data, isFetching } = useQuery({
@@ -110,6 +122,7 @@ export function OrdersPage() {
       statusFilter,
       typeFilter,
       currencyFilter,
+      dateRange,
     ],
     queryFn: async () => {
       const result = await fetchOrders(queryParams);
@@ -146,6 +159,12 @@ export function OrdersPage() {
 
   const handleCurrencyChange = (value: string | null) => {
     setCurrencyFilter(value ?? "");
+    cursorHistory.current = [];
+    goToPage(undefined);
+  };
+
+  const handleDateRangeChange = (from: Date, to: Date) => {
+    setDateRange({ from, to });
     cursorHistory.current = [];
     goToPage(undefined);
   };
@@ -338,6 +357,10 @@ export function OrdersPage() {
               ))}
             </SelectContent>
           </Select>
+        </FilterGroup>
+
+        <FilterGroup label="Date">
+          <DatePickerWithRange onApply={handleDateRangeChange} />
         </FilterGroup>
       </div>
 
