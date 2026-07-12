@@ -1,0 +1,68 @@
+export interface Order {
+  id: string;
+  orderId: string;
+  user: string;
+  merchant: string;
+  recipientAddr: string;
+  acceptedMerchant: string;
+  usdc: number;
+  fiat: number;
+  orderType: 'BUY' | 'SELL' | 'RENT';
+  currency: string;
+  status: 'placed' | 'accepted' | 'paid' | 'completed' | 'cancelled';
+  createdBlock: number;
+  updatedBlock: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderEvent {
+  id: string;
+  orderId: string;
+  eventName: 'OrderPlaced' | 'OrderAccepted' | 'BuyOrderPaid' | 'OrderCompleted' | 'CancelledOrders';
+  user: string;
+  merchant: string;
+  recipientAddr: string;
+  acceptedMerchant: string;
+  usdc: number;
+  fiat: number;
+  orderType: string;
+  currency: string;
+  blockNumber: number;
+  txHash: string;
+  logIndex: number | null;
+  createdAt: string;
+}
+
+export interface OrderDetail extends Order {
+  events: OrderEvent[];
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  nextCursor: string | null;
+}
+
+export interface StatsResponse {
+  orders: number;
+  events: number;
+  byStatus: { status: string; total: number }[];
+  byCurrency: { currency: string; totalUsdc: number; totalFiat: number; count: number }[];
+}
+
+export interface OrderQueryParams {
+  cursor?: string;
+  limit?: number;
+  status?: string;
+  currency?: string;
+  orderType?: string;
+}
+
+export interface EventQueryParams {
+  cursor?: string;
+  limit?: number;
+  eventName?: string;
+  orderId?: string;
+  fromBlock?: number;
+  toBlock?: number;
+}
