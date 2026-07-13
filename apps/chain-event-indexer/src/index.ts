@@ -56,7 +56,9 @@ async function main() {
   const poller = startBlockPoller(6000, startBlock);
 
   poller.onBlock(async (blockNumber) => {
+    console.log(`Procesando bloque ${blockNumber}`);
     const events = await fetchBlockEvents(blockNumber);
+    console.log(`Bloque ${blockNumber} procesado`);
     if (events.length > 0) {
       for (const e of events) {
         await persistEvent(db, e);

@@ -10,6 +10,7 @@
     "scan": "tsx src/scan-blocks.ts",
     "check-blocks": "tsx src/check-blocks.ts",
     "reprocess-failed": "tsx src/reprocess-failed.ts",
+    "fix-timestamps": "tsx src/fix-block-timestamps.ts",
     "lint": "tsc --noEmit",
     "check-types": "tsc --noEmit",
     "db:generate": "pnpm --filter @p2p-me/db db:generate",
