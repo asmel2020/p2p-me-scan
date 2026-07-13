@@ -13,7 +13,7 @@ import { persistEvent } from "./db/store";
 import { setLastBlock } from "./db/state";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import * as schema from "@p2p-me/db";
-
+//dsad
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const LOG_FILE = path.resolve(__dirname, "rpc-errors-catchup.log");
@@ -29,7 +29,10 @@ function logRpcError(rpcUrl: string, context: string, err: unknown) {
 }
 
 const RPC_CONFIG = [
-  { url: "https://rpc.ankr.com/base/9676e91ab178d118be498a3fa0f25ea5499e26bbfa8126ec2b1119d0238b4e02", concurrency: 10 },
+  {
+    url: "https://rpc.ankr.com/base/9676e91ab178d118be498a3fa0f25ea5499e26bbfa8126ec2b1119d0238b4e02",
+    concurrency: 10,
+  },
   { url: "https://mainnet.base.org", concurrency: 5 },
   { url: "https://8453.rpc.thirdweb.com", concurrency: 5 },
 ];
@@ -191,7 +194,11 @@ async function processChunk(
       if (fromBlock === toBlock) {
         const msg = err.message ?? "error";
         console.error(`  Bloque irrecuperable ${fromBlock}: ${msg}`);
-        logRpcError(RPC_URLS[clientIndex], `Block irrecuperable: ${fromBlock}`, err);
+        logRpcError(
+          RPC_URLS[clientIndex],
+          `Block irrecuperable: ${fromBlock}`,
+          err,
+        );
         failedChunks.push(`Bloque ${fromBlock}`);
         return [];
       }
@@ -250,7 +257,9 @@ export async function fastCatchup(
     const elapsed = (Date.now() - startTime) / 1000;
     const pct = ((processedChunks / chunks.length) * 100).toFixed(1);
     const avgPerChunk = elapsed / Math.max(1, processedChunks);
-    const remaining = Math.round(avgPerChunk * (chunks.length - processedChunks));
+    const remaining = Math.round(
+      avgPerChunk * (chunks.length - processedChunks),
+    );
     const fmtRemaining =
       remaining >= 60
         ? `${Math.floor(remaining / 60)}m ${remaining % 60}s`
@@ -282,7 +291,9 @@ export async function fastCatchup(
   await setLastBlock(db, toBlock);
 
   const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log(`\n=== CATCHUP COMPLETADO en ${totalTime}s — ${totalEvents} eventos ===`);
+  console.log(
+    `\n=== CATCHUP COMPLETADO en ${totalTime}s — ${totalEvents} eventos ===`,
+  );
 
   if (failedChunks.length > 0) {
     console.log(`\nBloques fallidos (${failedChunks.length}):`);
