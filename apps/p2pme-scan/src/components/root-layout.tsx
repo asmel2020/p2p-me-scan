@@ -22,7 +22,7 @@ export function RootLayout({ children }: { children?: ReactNode }) {
     const q = searchValue.trim();
     if (!q) return;
     try {
-      const detail = await fetchOrder(q);
+      const detail = await fetchOrder(Number(q));
       setSearchedOrder({
         id: detail.id,
         orderId: detail.orderId,

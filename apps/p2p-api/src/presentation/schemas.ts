@@ -15,7 +15,7 @@ export const orderQuerySchema = cursorPaginationSchema.extend({
 
 export const eventQuerySchema = cursorPaginationSchema.extend({
   eventName: z.enum(["OrderPlaced", "OrderAccepted", "BuyOrderPaid", "OrderCompleted", "CancelledOrders"]).optional(),
-  orderId: z.string().optional(),
+  orderId: z.number().optional(),
   fromBlock: z.coerce.number().int().optional(),
   toBlock: z.coerce.number().int().optional(),
 });

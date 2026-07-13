@@ -1,29 +1,13 @@
-import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
-import { createPublicClient, http } from "viem";
-import { base } from "viem/chains";
-import { decodeLog, ORDER_EVENT_ABI, DIAMOND_ADDRESS, type ChainEvent } from "./events";
+import { decodeLog, ORDER_EVENT_ABI, DIAMOND_ADDRESS, type ChainEvent } from "../shared/events";
 import { initRemoteDB } from "@p2p-me/db/client";
-import { persistEvent } from "./db/store";
+import { persistEvent } from "../shared/db/store";
+import { RPC_URLS, createClient, logRpcError } from "../shared/rpc-config";
+import { getCloudflareEnv } from "../shared/env";
+import { DATA_DIR } from "../shared/rpc-config";
 
-const envPath = path.resolve(process.cwd(), "../../.env");
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-}
-
-const { CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_DATABASE_ID, CLOUDFLARE_API_TOKEN } = process.env;
-
-if (!CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_DATABASE_ID || !CLOUDFLARE_API_TOKEN) {
-  console.error("Faltan variables de entorno: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_DATABASE_ID, CLOUDFLARE_API_TOKEN");
-  process.exit(1);
-}
-
-const RPC_URLS = ["https://mainnet.base.org", "https://8453.rpc.thirdweb.com"];
-
-function createClient(url: string) {
-  return createPublicClient({ chain: base, transport: http(url, { timeout: 30000 }) });
-}
+const { accountId, databaseId, apiToken } = getCloudflareEnv();
 
 const clients = RPC_URLS.map(createClient);
 
@@ -70,7 +54,7 @@ async function fetchBlockEvents(blockNumber: bigint): Promise<ChainEvent[]> {
 }
 
 async function main() {
-  const failedFilePath = path.resolve(process.cwd(), "failed-blocks.json");
+  const failedFilePath = path.resolve(DATA_DIR, "failed-blocks.json");
   if (!fs.existsSync(failedFilePath)) {
     console.error(`No se encuentra ${failedFilePath}`);
     process.exit(1);
@@ -87,7 +71,7 @@ async function main() {
 
   console.log(`Reprocesando ${failedBlocks.length} bloques fallidos...\n`);
 
-  const db = initRemoteDB(CLOUDFLARE_ACCOUNT_ID!, CLOUDFLARE_DATABASE_ID!, CLOUDFLARE_API_TOKEN!);
+  const db = initRemoteDB(accountId, databaseId, apiToken);
 
   let totalEvents = 0;
   const stillFailing: string[] = [];
@@ -110,7 +94,7 @@ async function main() {
   console.log(`\nTotal eventos recuperados: ${totalEvents}`);
 
   if (stillFailing.length > 0) {
-    const failedFile = path.resolve(process.cwd(), "failed-blocks.json");
+    const failedFile = path.resolve(DATA_DIR, "failed-blocks.json");
     fs.writeFileSync(
       failedFile,
       JSON.stringify(

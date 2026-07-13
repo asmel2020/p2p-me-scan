@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d95331d2-87f1-4fdc-8642-c769fa294051",
+  "id": "29121441-6121-4398-b4ee-42a22db71b6c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "order_events": {
@@ -16,7 +16,7 @@
         },
         "order_id": {
           "name": "order_id",
-          "type": "text",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -186,7 +186,7 @@
         },
         "order_id": {
           "name": "order_id",
-          "type": "text",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false

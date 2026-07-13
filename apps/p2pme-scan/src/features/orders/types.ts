@@ -1,6 +1,6 @@
 export interface Order {
   id: string;
-  orderId: string;
+  orderId: number;
   user: string;
   merchant: string;
   recipientAddr: string;
@@ -19,7 +19,7 @@ export interface Order {
 
 export interface OrderEvent {
   id: string;
-  orderId: string;
+  orderId: number;
   eventName: 'OrderPlaced' | 'OrderAccepted' | 'BuyOrderPaid' | 'OrderCompleted' | 'CancelledOrders';
   user: string;
   merchant: string;
@@ -71,7 +71,7 @@ export interface EventQueryParams {
   cursor?: string;
   limit?: number;
   eventName?: string;
-  orderId?: string;
+  orderId?: number;
   fromBlock?: number;
   toBlock?: number;
 }

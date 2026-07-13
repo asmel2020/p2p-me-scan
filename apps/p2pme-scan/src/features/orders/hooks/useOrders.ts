@@ -18,7 +18,7 @@ export function useOrdersInfinite(params: Omit<OrderQueryParams, 'cursor'> = {})
   });
 }
 
-export function useOrder(orderId: string) {
+export function useOrder(orderId: number) {
   return useQuery({
     queryKey: ['order', orderId],
     queryFn: () => fetchOrder(orderId),

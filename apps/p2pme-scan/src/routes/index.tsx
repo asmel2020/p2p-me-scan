@@ -5,7 +5,7 @@ import { OrdersPage } from "@/features/orders/page";
 const searchSchema = z.object({
   cursor: z.string().optional(),
   limit: z.coerce.number().optional(),
-  orderId: z.string().optional(),
+  orderId: z.coerce.number().optional(),
 });
 
 export const Route = createFileRoute("/")({

@@ -1,12 +1,11 @@
-import { createPublicClient, http, type Address, type Log } from "viem";
-import { base } from "viem/chains";
+import { type Address, type Log } from "viem";
+import { createClient, RPC_URLS } from "./rpc-config";
 
 /* -------------------------------------------------------------------------- */
 /*  Constantes de configuración                                               */
 /* -------------------------------------------------------------------------- */
 
-const RPC_URL =
-  "https://open-platform.nodereal.io/7ec788841b9f40b68f6388040bca2a68/base";
+const RPC_URL = RPC_URLS[0];
 const DIAMOND_ADDRESS = "0x4cad6eC90e65baBec9335cAd728DDC610c316368";
 
 /* -------------------------------------------------------------------------- */
@@ -168,7 +167,7 @@ function decodeCurrency(hex: string): string {
 /* -------------------------------------------------------------------------- */
 
 export type ChainEvent = {
-  orderId: string;
+  orderId: number;
   eventName: string;
   user: string;
   merchant: string;
@@ -195,10 +194,7 @@ export type FetchEventsResult = {
 /*  Cliente viem                                                              */
 /* -------------------------------------------------------------------------- */
 
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(RPC_URL),
-}) as any;
+const publicClient = createClient(RPC_URL);
 
 /* -------------------------------------------------------------------------- */
 /*  Funciones públicas                                                        */
@@ -209,7 +205,7 @@ function decodeLog(log: Log): ChainEvent | null {
 
   const eventName = EVENT_NAMES[log.topics[0]] ?? "Unknown";
 
-  const orderId = log.topics[1] ? BigInt(log.topics[1]).toString() : "?";
+  const orderId = log.topics[1] ? Number(BigInt(log.topics[1])) : 0;
   let user = "-";
   let merchant = "-";
   if (log.topics[2]) {

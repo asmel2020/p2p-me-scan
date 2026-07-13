@@ -6,12 +6,12 @@ export async function fetchOrders(params: OrderQueryParams = {}): Promise<Pagina
   return data;
 }
 
-export async function fetchOrder(orderId: string): Promise<OrderDetail> {
+export async function fetchOrder(orderId: number): Promise<OrderDetail> {
   const { data } = await apiClient.get<OrderDetail>(`/orders/${orderId}`);
   return data;
 }
 
-export async function fetchOrderEvents(orderId: string): Promise<{ orderId: string; events: OrderEvent[]; total: number }> {
-  const { data } = await apiClient.get<{ orderId: string; events: OrderEvent[]; total: number }>(`/orders/${orderId}/events`);
+export async function fetchOrderEvents(orderId: number): Promise<{ orderId: number; events: OrderEvent[]; total: number }> {
+  const { data } = await apiClient.get<{ orderId: number; events: OrderEvent[]; total: number }>(`/orders/${orderId}/events`);
   return data;
 }

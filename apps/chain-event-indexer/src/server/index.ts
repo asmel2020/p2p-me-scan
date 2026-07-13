@@ -1,48 +1,21 @@
-import dotenv from "dotenv";
-import fs from "fs";
-import path from "path";
-
-import { createPublicClient, http } from "viem";
 import { startBlockPoller } from "./block-poller";
-import { fetchBlockEvents } from "./events";
+import { fetchBlockEvents } from "../shared/events";
 import { initRemoteDB } from "@p2p-me/db/client";
-import { persistEvent } from "./db/store";
-import { getLastBlock, setLastBlock } from "./db/state";
+import { persistEvent } from "../shared/db/store";
+import { getLastBlock, setLastBlock } from "../shared/db/state";
 import { fastCatchup } from "./catchup";
+import { createClient, RPC_URLS } from "../shared/rpc-config";
+import { getCloudflareEnv } from "../shared/env";
 
-const envPath = path.resolve(process.cwd(), "../../.env");
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-}
+const { accountId, databaseId, apiToken } = getCloudflareEnv();
 
-const { CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_DATABASE_ID, CLOUDFLARE_API_TOKEN } =
-  process.env;
-
-if (
-  !CLOUDFLARE_ACCOUNT_ID ||
-  !CLOUDFLARE_DATABASE_ID ||
-  !CLOUDFLARE_API_TOKEN
-) {
-  console.error(
-    "Faltan variables de entorno: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_DATABASE_ID, CLOUDFLARE_API_TOKEN",
-  );
-  process.exit(1);
-}
-
-const ACCOUNT_ID = CLOUDFLARE_ACCOUNT_ID!;
-const DB_ID = CLOUDFLARE_DATABASE_ID!;
-const API_TOKEN = CLOUDFLARE_API_TOKEN!;
-
-const publicClient = createPublicClient({
-  transport: http(
-    "https://rpc.ankr.com/base/9676e91ab178d118be498a3fa0f25ea5499e26bbfa8126ec2b1119d0238b4e02",
-  ),
-});
+const publicClient = createClient(RPC_URLS[0]);
 
 const LOOKBACK = 1000n;
+const CATCHUP_THRESHOLD = 100n;
 
 async function main() {
-  const db = initRemoteDB(ACCOUNT_ID, DB_ID, API_TOKEN);
+  const db = initRemoteDB(accountId, databaseId, apiToken);
 
   const savedBlock = await getLastBlock(db);
   let startBlock: bigint | undefined;
@@ -58,7 +31,6 @@ async function main() {
 
   const currentBlock = await publicClient.getBlockNumber();
   const gap = currentBlock - startBlock;
-  const CATCHUP_THRESHOLD = 100n;
 
   if (gap > CATCHUP_THRESHOLD) {
     await fastCatchup(db, startBlock, currentBlock);

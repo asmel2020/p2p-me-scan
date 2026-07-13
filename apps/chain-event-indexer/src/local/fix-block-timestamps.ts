@@ -1,81 +1,37 @@
-import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { eq, count } from "drizzle-orm";
-import { createPublicClient, http } from "viem";
-import { base } from "viem/chains";
+import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { initRemoteDB } from "@p2p-me/db/client";
 import * as schema from "@p2p-me/db";
+import { RPC_CONFIG, RPC_URLS, createClient, logRpcError, LOG_FILE, DATA_DIR } from "../shared/rpc-config";
+import { getCloudflareEnv } from "../shared/env";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const LOG_FILE = path.resolve(__dirname, "rpc-errors.log");
+const LOCAL_DB_PATH = path.resolve(DATA_DIR, "block-timestamps.db");
 
-const envPath = path.resolve(process.cwd(), "../../.env");
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-}
-
-const { CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_DATABASE_ID, CLOUDFLARE_API_TOKEN } =
-  process.env;
-
-if (
-  !CLOUDFLARE_ACCOUNT_ID ||
-  !CLOUDFLARE_DATABASE_ID ||
-  !CLOUDFLARE_API_TOKEN
-) {
-  console.error(
-    "Faltan variables de entorno: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_DATABASE_ID, CLOUDFLARE_API_TOKEN",
-  );
-  process.exit(1);
-}
+const { accountId, databaseId, apiToken } = getCloudflareEnv();
 
 /* -------------------------------------------------------------------------- */
-/*  RPCs                                                                      */
+/*  Local SQLite                                                               */
 /* -------------------------------------------------------------------------- */
 
-const RPC_CONFIG = [
-  {
-    url: "https://rpc.ankr.com/base/e487627c09ac093cbf96da8b4661adbda413391c1824c0c09a8bb1ad314bdd06",
-    concurrency: 25,
-  },
-  {
-    url: "https://rpc.ankr.com/base/285e771bfe6acaa6bb6e61aff95927f087f0a7b06d4b5c8be826e44914d49ec4",
-    concurrency: 25,
-  },
-  {
-    url: "https://rpc.ankr.com/base/277bb99f6262d8fc43f35b8c9e78858bcbbea4184dbf49cdc1a960429a76128d",
-    concurrency: 25,
-  },
-  /*  {
-    url: "https://rpc.ankr.com/base/9676e91ab178d118be498a3fa0f25ea5499e26bbfa8126ec2b1119d0238b4e02",
-    concurrency: 25,
-  }, */
-  { url: "https://mainnet.base.org", concurrency: 8 },
-];
-const RPC_URLS = RPC_CONFIG.map((c) => c.url);
+const localDb = new Database(LOCAL_DB_PATH);
+localDb.pragma("journal_mode = WAL");
+localDb.exec(`
+  CREATE TABLE IF NOT EXISTS block_timestamps (
+    block_number INTEGER PRIMARY KEY,
+    block_timestamp TEXT NOT NULL,
+    block_timestamp_unix INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`);
 
-function createClient(url: string) {
-  return createPublicClient({
-    chain: base,
-    transport: http(url, { timeout: 30000 }),
-  });
-}
-
-function logRpcError(
-  rpcUrl: string,
-  blockNum: number,
-  err: unknown,
-  phase: string,
-) {
-  const msg =
-    (err as any)?.message ??
-    (err as any)?.shortMessage ??
-    (err as any)?.cause ??
-    String(err);
-  const line = `[${new Date().toISOString()}] [${phase}] RPC: ${rpcUrl} | Block: ${blockNum} | Error: ${msg}\n`;
-  fs.appendFileSync(LOG_FILE, line);
+function countLocal(): number {
+  const row = localDb.prepare("SELECT COUNT(*) as c FROM block_timestamps").get() as any;
+  return row.c;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -132,7 +88,6 @@ function stopProgressReporter() {
 
 async function runSharedQueue(
   blocks: number[],
-  db: ReturnType<typeof initRemoteDB>,
   failedBlocks: number[],
   rpcErrors: Map<string, number>,
 ): Promise<number> {
@@ -146,12 +101,12 @@ async function runSharedQueue(
       if (blockNum === null) break;
       try {
         const ts = await fetchBlockTimestamp(client, blockNum);
-        await updateBlockTimestamps(db, blockNum, ts);
+        updateBlockTimestamps(blockNum, ts);
         updated++;
       } catch (err) {
         failedBlocks.push(blockNum);
         rpcErrors.set(rpcUrl, (rpcErrors.get(rpcUrl) ?? 0) + 1);
-        logRpcError(rpcUrl, blockNum, err, "first-pass");
+        logRpcError(rpcUrl, `Block: ${blockNum}`, err, "first-pass", true);
       } finally {
         globalProgress++;
       }
@@ -213,7 +168,6 @@ const ALL_CLIENTS = RPC_URLS.map(createClient);
 
 async function reprocessFailed(
   failedBlocks: number[],
-  db: ReturnType<typeof initRemoteDB>,
 ): Promise<number> {
   if (failedBlocks.length === 0) return 0;
 
@@ -235,11 +189,11 @@ async function reprocessFailed(
         for (let ci = 0; ci < ALL_CLIENTS.length && !success; ci++) {
           try {
             const ts = await fetchBlockTimestamp(ALL_CLIENTS[ci], blockNum);
-            await updateBlockTimestamps(db, blockNum, ts);
+            updateBlockTimestamps(blockNum, ts);
             recovered++;
             success = true;
           } catch (err) {
-            logRpcError(RPC_URLS[ci], blockNum, err, "reprocess");
+            logRpcError(RPC_URLS[ci], `Block: ${blockNum}`, err, "reprocess", true);
           }
         }
         if (!success) {
@@ -274,22 +228,14 @@ async function reprocessFailed(
 /*  Updates                                                                   */
 /* -------------------------------------------------------------------------- */
 
-async function updateBlockTimestamps(
-  db: ReturnType<typeof initRemoteDB>,
-  blockNum: number,
-  ts: number,
-): Promise<void> {
+const upsertStmt = localDb.prepare(`
+  INSERT OR REPLACE INTO block_timestamps (block_number, block_timestamp, block_timestamp_unix)
+  VALUES (?, ?, ?)
+`);
+
+function updateBlockTimestamps(blockNum: number, ts: number): void {
   const isoString = new Date(ts * 1000).toISOString();
-
-  await db
-    .update(schema.orderEvents)
-    .set({ blockTimestamp: isoString, blockTimestampUnix: ts })
-    .where(eq(schema.orderEvents.blockNumber, blockNum));
-
-  await db
-    .update(schema.orders)
-    .set({ blockTimestamp: isoString, blockTimestampUnix: ts })
-    .where(eq(schema.orders.updatedBlock, blockNum));
+  upsertStmt.run(blockNum, isoString, ts);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -297,11 +243,7 @@ async function updateBlockTimestamps(
 /* -------------------------------------------------------------------------- */
 
 async function main() {
-  const db = initRemoteDB(
-    CLOUDFLARE_ACCOUNT_ID!,
-    CLOUDFLARE_DATABASE_ID!,
-    CLOUDFLARE_API_TOKEN!,
-  );
+  const db = initRemoteDB(accountId, databaseId, apiToken);
 
   console.log("Obteniendo bloques con block_timestamp_unix = 0...");
   const rows = await db
@@ -339,7 +281,7 @@ async function main() {
   const totalWorkers = RPC_CONFIG.reduce((s, c) => s + c.concurrency, 0);
   console.log(`  Total: ${totalWorkers} requests simultáneas\n`);
 
-  totalUpdated = await runSharedQueue(allBlocks, db, failedBlocks, rpcErrors);
+  totalUpdated = await runSharedQueue(allBlocks, failedBlocks, rpcErrors);
 
   stopProgressReporter();
 
@@ -353,7 +295,7 @@ async function main() {
     globalTotal = failedBlocks.length;
     startProgressReporter();
   }
-  const recovered = await reprocessFailed(failedBlocks, db);
+  const recovered = await reprocessFailed(failedBlocks);
   stopProgressReporter();
   totalUpdated += recovered;
 
@@ -376,11 +318,9 @@ async function main() {
     }
   }
 
-  const pending = await db
-    .select({ total: count() })
-    .from(schema.orderEvents)
-    .where(eq(schema.orderEvents.blockTimestampUnix, 0));
-  console.log(`  Pendientes en order_events: ${pending[0]?.total ?? "?"}`);
+  console.log(`  Registros en SQLite local: ${countLocal()}`);
+  console.log(`  DB local: ${LOCAL_DB_PATH}`);
+  console.log(`  Para migrar a D1: pnpm tsx src/migrate-local-to-d1.ts`);
 }
 
 main().catch(console.error);

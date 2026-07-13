@@ -41,13 +41,13 @@ const statusVariant: Record<string, 'default' | 'success' | 'warning' | 'destruc
 };
 
 export function OrderModal({ order, onClose }: OrderModalProps) {
-  const { data: orderDetail, isLoading } = useOrder(order?.orderId ?? '');
+  const { data: orderDetail, isLoading } = useOrder(order?.orderId ?? 0);
   const [showShare, setShowShare] = useState(false);
 
   if (!order) return null;
 
   const shareUrl = `${window.location.origin}/?orderId=${order.orderId}`;
-  const shareText = `P2P Order ${order.orderId.slice(0, 8)}… | ${typeLabels[order.orderType] || order.orderType} · ${order.usdc} USDC · ${order.fiat} ${order.currency}`;
+  const shareText = `P2P Order ${String(order.orderId).slice(0, 8)}… | ${typeLabels[order.orderType] || order.orderType} · ${order.usdc} USDC · ${order.fiat} ${order.currency}`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl).then(() => setShowShare(false));

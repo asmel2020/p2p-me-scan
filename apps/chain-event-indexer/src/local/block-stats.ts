@@ -1,12 +1,6 @@
-import { createPublicClient, http } from "viem";
-import { base } from "viem/chains";
+import { createClient, RPC_URLS } from "../shared/rpc-config";
 
-const RPC_URL = "https://mainnet.base.org";
-
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(RPC_URL),
-});
+const publicClient = createClient(RPC_URLS[0]);
 
 const TARGET_DATE = new Date("2026-01-01T00:00:00Z");
 

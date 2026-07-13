@@ -1,6 +1,6 @@
 CREATE TABLE `order_events` (
 	`id` text PRIMARY KEY NOT NULL,
-	`order_id` text NOT NULL,
+	`order_id` integer NOT NULL,
 	`event_name` text NOT NULL,
 	`user` text NOT NULL,
 	`merchant` text DEFAULT '-' NOT NULL,
@@ -23,7 +23,7 @@ CREATE INDEX `idx_events_block_number_log_index` ON `order_events` (`block_numbe
 CREATE UNIQUE INDEX `idx_events_tx_hash_log_index_unique` ON `order_events` (`tx_hash`,`log_index`);--> statement-breakpoint
 CREATE TABLE `orders` (
 	`id` text PRIMARY KEY NOT NULL,
-	`order_id` text NOT NULL,
+	`order_id` integer NOT NULL,
 	`user` text NOT NULL,
 	`merchant` text DEFAULT '-' NOT NULL,
 	`recipient_addr` text DEFAULT '-' NOT NULL,

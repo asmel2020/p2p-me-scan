@@ -1,23 +1,13 @@
-import { createPublicClient, http } from "viem";
-import { base } from "viem/chains";
+import { createClient, RPC_URLS, Semaphore } from "../shared/rpc-config";
 
-const RPC_URLS = [
-  "https://mainnet.base.org,https://8453.rpc.thirdweb.com",
-  "https://mainnet.base.org",
-]; /* "https://mainnet.base.org,https://8453.rpc.thirdweb.com".split(
-  ",",
-); */
-
-let rpcIndex = 0;
-
-function createFallbackClient(url: string) {
-  return createPublicClient({
-    chain: base,
-    transport: http(url),
-  });
+const semaphores = new Map<string, Semaphore>();
+for (const url of RPC_URLS) {
+  semaphores.set(url, new Semaphore(1));
 }
 
-let publicClient = createFallbackClient(RPC_URLS[0]);
+let rpcIndex = 0;
+let currentUrl = RPC_URLS[0];
+let currentClient = createClient(currentUrl);
 
 export type BlockHandler = (blockNumber: bigint) => void | Promise<void>;
 
@@ -34,10 +24,28 @@ export function startBlockPoller(
   const maxErrorsBeforeBackoff = 5;
   const handlers: BlockHandler[] = [];
 
+  function switchRpc() {
+    rpcIndex = (rpcIndex + 1) % RPC_URLS.length;
+    currentUrl = RPC_URLS[rpcIndex];
+    currentClient = createClient(currentUrl);
+    const short = currentUrl.replace(/https?:\/\//, "").slice(0, 45);
+    console.warn(`RPC falló, cambiando a ${short} (intento ${consecutiveErrors})`);
+  }
+
+  async function getBlockNumber(): Promise<bigint> {
+    const sem = semaphores.get(currentUrl)!;
+    await sem.acquire();
+    try {
+      return await currentClient.getBlockNumber();
+    } finally {
+      sem.release();
+    }
+  }
+
   async function poll() {
     while (running) {
       try {
-        const current = await publicClient.getBlockNumber();
+        const current = await getBlockNumber();
         consecutiveErrors = 0;
 
         if (lastBlock === 0n) {
@@ -56,14 +64,7 @@ export function startBlockPoller(
         }
       } catch {
         consecutiveErrors++;
-
-        if (RPC_URLS.length > 1) {
-          rpcIndex = (rpcIndex + 1) % RPC_URLS.length;
-          publicClient = createFallbackClient(RPC_URLS[rpcIndex]);
-          console.warn(
-            `RPC falló, cambiando a ${RPC_URLS[rpcIndex]} (intento ${consecutiveErrors})`,
-          );
-        }
+        switchRpc();
 
         const backoff =
           consecutiveErrors > maxErrorsBeforeBackoff

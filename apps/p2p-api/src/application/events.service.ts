@@ -10,7 +10,7 @@ export interface GetEventsQuery {
   cursorLog?: number;
   limit: number;
   eventName?: string;
-  orderId?: string;
+  orderId?: number;
   fromBlock?: number;
   toBlock?: number;
 }

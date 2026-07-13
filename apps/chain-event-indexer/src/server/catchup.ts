@@ -1,62 +1,28 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import { createPublicClient, http } from "viem";
-import { base } from "viem/chains";
 import {
   decodeLog,
   ORDER_EVENT_ABI,
   DIAMOND_ADDRESS,
   type ChainEvent,
-} from "./events";
-import { persistEvent } from "./db/store";
-import { setLastBlock } from "./db/state";
+} from "../shared/events";
+import { persistEvent } from "../shared/db/store";
+import { setLastBlock } from "../shared/db/state";
+import {
+  RPC_CONFIG,
+  RPC_URLS,
+  createClient,
+  logRpcError,
+  Semaphore,
+} from "../shared/rpc-config";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import * as schema from "@p2p-me/db";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const LOG_FILE = path.resolve(__dirname, "rpc-errors-catchup.log");
-
-function logRpcError(rpcUrl: string, context: string, err: unknown) {
-  const msg =
-    (err as any)?.message ??
-    (err as any)?.shortMessage ??
-    (err as any)?.cause ??
-    String(err);
-  const line = `[${new Date().toISOString()}] [catchup] RPC: ${rpcUrl} | ${context} | Error: ${msg}\n`;
-  fs.appendFileSync(LOG_FILE, line);
-}
-
-const RPC_CONFIG = [
-  {
-    url: "https://rpc.ankr.com/base/9676e91ab178d118be498a3fa0f25ea5499e26bbfa8126ec2b1119d0238b4e02",
-    concurrency: 10,
-  },
-  { url: "https://mainnet.base.org", concurrency: 5 },
-  { url: "https://8453.rpc.thirdweb.com", concurrency: 5 },
-];
-const RPC_URLS = RPC_CONFIG.map((c) => c.url);
 const CHUNK_SIZE = 800n;
 
-const poolIndices: number[] = [];
-for (let i = 0; i < RPC_CONFIG.length; i++) {
-  for (let j = 0; j < RPC_CONFIG[i].concurrency; j++) {
-    poolIndices.push(i);
-  }
-}
-
-function createClient(url: string) {
-  return createPublicClient({
-    chain: base,
-    transport: http(url, { timeout: 30000 }),
-  });
-}
-
+const semaphores = RPC_CONFIG.map((c) => new Semaphore(c.maxInflight));
 const clients = RPC_URLS.map(createClient);
 const failedChunks: string[] = [];
 const persistErrors: string[] = [];
-const PERSIST_CONCURRENCY = 3; // inserts simultáneos a D1
+const PERSIST_CONCURRENCY = 3;
 
 async function fetchBlockTimestampSafe(
   blockNumber: bigint,
@@ -64,8 +30,13 @@ async function fetchBlockTimestampSafe(
   for (let attempt = 0; attempt < 3; attempt++) {
     for (let ci = 0; ci < clients.length; ci++) {
       try {
-        const block = (await clients[ci].getBlock({ blockNumber })) as any;
-        return Number(block.timestamp);
+        await semaphores[ci].acquire();
+        try {
+          const block = (await clients[ci].getBlock({ blockNumber })) as any;
+          return Number(block.timestamp);
+        } finally {
+          semaphores[ci].release();
+        }
       } catch (err: any) {
         const isRateLimit =
           err.message?.includes("rate limit") ||
@@ -122,12 +93,18 @@ async function processChunk(
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const logs = await clients[clientIndex].getLogs({
-        address: DIAMOND_ADDRESS as any,
-        events: ORDER_EVENT_ABI,
-        fromBlock,
-        toBlock,
-      });
+      await semaphores[clientIndex].acquire();
+      let logs;
+      try {
+        logs = await clients[clientIndex].getLogs({
+          address: DIAMOND_ADDRESS as any,
+          events: ORDER_EVENT_ABI,
+          fromBlock,
+          toBlock,
+        });
+      } finally {
+        semaphores[clientIndex].release();
+      }
 
       if (logs.length === 0) return [];
 
@@ -262,14 +239,14 @@ export async function fastCatchup(
     chunks.push({ from: b, to: end });
   }
 
-  const totalWorkers = poolIndices.length;
+  const totalWorkers = RPC_CONFIG.reduce((s, c) => s + c.maxInflight, 0);
   console.log(
     `  ${chunks.length} chunks de ${CHUNK_SIZE} bloques (workers: ${totalWorkers})`,
   );
   console.log(`  Pool de workers:`);
-  for (const { url, concurrency } of RPC_CONFIG) {
+  for (const { url, maxInflight } of RPC_CONFIG) {
     const short = url.replace(/https?:\/\//, "").slice(0, 45);
-    console.log(`    ${String(concurrency).padStart(2)} workers → ${short}`);
+    console.log(`    ${String(maxInflight).padStart(2)} workers → ${short}`);
   }
   console.log("  Procesando...");
 
@@ -282,19 +259,25 @@ export async function fastCatchup(
   let totalEvents = 0;
   const startTime = Date.now();
 
-  await Promise.all(
-    poolIndices.map(async (clientIndex) => {
-      while (true) {
-        const chunk = takeNextChunk();
-        if (!chunk) break;
-        const events = await processChunk(chunk.from, chunk.to, clientIndex);
-        if (events.length > 0) {
-          await persistEventsWithLimit(db, events);
-        }
-        totalEvents += events.length;
-      }
-    }),
-  );
+  const workerPromises: Promise<void>[] = [];
+  for (let ci = 0; ci < RPC_CONFIG.length; ci++) {
+    for (let w = 0; w < RPC_CONFIG[ci].maxInflight; w++) {
+      workerPromises.push(
+        (async () => {
+          while (true) {
+            const chunk = takeNextChunk();
+            if (!chunk) break;
+            const events = await processChunk(chunk.from, chunk.to, ci);
+            if (events.length > 0) {
+              await persistEventsWithLimit(db, events);
+            }
+            totalEvents += events.length;
+          }
+        })(),
+      );
+    }
+  }
+  await Promise.all(workerPromises);
 
   await setLastBlock(db, toBlock);
 
@@ -308,17 +291,17 @@ export async function fastCatchup(
     for (const f of failedChunks) {
       console.log(`  - ${f}`);
     }
-    console.log(`  (detalles en ${LOG_FILE})`);
-  }
-  if (persistErrors.length > 0) {
-    console.log(`\nErrores de persistencia (${persistErrors.length}):`);
-    for (const e of persistErrors.slice(0, 10)) {
-      console.log(`  - ${e}`);
+console.log(`  (detalles en rpc-errors.log)`);
     }
-    if (persistErrors.length > 10) {
-      console.log(`  ... y ${persistErrors.length - 10} más`);
-    }
-    console.log(`  (detalles en ${LOG_FILE})`);
+    if (persistErrors.length > 0) {
+      console.log(`\nErrores de persistencia (${persistErrors.length}):`);
+      for (const e of persistErrors.slice(0, 10)) {
+        console.log(`  - ${e}`);
+      }
+      if (persistErrors.length > 10) {
+        console.log(`  ... y ${persistErrors.length - 10} más`);
+      }
+      console.log(`  (detalles en rpc-errors.log)`);
   }
   console.log("");
 }

@@ -1,12 +1,5 @@
-import { createPublicClient, http } from "viem";
-import { base } from "viem/chains";
-import { decodeLog, ORDER_EVENT_ABI, DIAMOND_ADDRESS, type ChainEvent } from "./events";
-
-const RPC_URLS = ["https://mainnet.base.org", "https://8453.rpc.thirdweb.com"];
-
-function createClient(url: string) {
-  return createPublicClient({ chain: base, transport: http(url, { timeout: 30000 }) });
-}
+import { decodeLog, ORDER_EVENT_ABI, DIAMOND_ADDRESS, type ChainEvent } from "../shared/events";
+import { RPC_URLS, createClient } from "../shared/rpc-config";
 
 const clients = RPC_URLS.map(createClient);
 
@@ -109,7 +102,7 @@ async function main() {
   console.error(`Total chunks: ${chunks.length}`);
 
   let totalEvents = 0;
-  const uniqueOrderIds = new Set<string>();
+  const uniqueOrderIds = new Set<number>();
 
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];

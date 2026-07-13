@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 
 export const orders = sqliteTable("orders", {
   id: text("id").primaryKey(),
-  orderId: text("order_id").notNull().unique(),
+  orderId: integer("order_id").notNull().unique(),
   user: text("user").notNull(),
   merchant: text("merchant").notNull().default("-"),
   recipientAddr: text("recipient_addr").notNull().default("-"),
@@ -34,7 +34,7 @@ export const orders = sqliteTable("orders", {
 
 export const orderEvents = sqliteTable("order_events", {
   id: text("id").primaryKey(),
-  orderId: text("order_id")
+  orderId: integer("order_id")
     .notNull()
     .references(() => orders.orderId),
   eventName: text("event_name").notNull(),

@@ -11,7 +11,7 @@ app.get("/", zValidator("query", orderQuerySchema), async (c) => {
   const db = initDB(c.env.DB);
   const query = c.req.valid("query");
   const cursorOrderId = query.cursor
-    ? (decodeCursor(query.cursor)?.o as string | undefined)
+    ? (decodeCursor(query.cursor)?.o as number | undefined)
     : undefined;
 
   const result = await getOrders(db, { ...query, cursorOrderId });
@@ -25,7 +25,7 @@ app.get("/", zValidator("query", orderQuerySchema), async (c) => {
 
 app.get("/:orderId", async (c) => {
   const db = initDB(c.env.DB);
-  const { orderId } = c.req.param();
+  const orderId = Number(c.req.param("orderId"));
 
   const order = await getOrder(db, orderId);
   if (!order) return c.json({ error: "Order not found" }, 404);
@@ -36,7 +36,7 @@ app.get("/:orderId", async (c) => {
 
 app.get("/:orderId/events", async (c) => {
   const db = initDB(c.env.DB);
-  const { orderId } = c.req.param();
+  const orderId = Number(c.req.param("orderId"));
 
   const order = await getOrder(db, orderId);
   if (!order) return c.json({ error: "Order not found" }, 404);

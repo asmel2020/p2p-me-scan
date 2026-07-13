@@ -7,7 +7,7 @@ import * as schema from "@p2p-me/db";
 type DB = DrizzleD1Database<typeof schema>;
 
 export interface GetOrdersQuery {
-  cursorOrderId?: string;
+  cursorOrderId?: number;
   limit: number;
   status?: string;
   currency?: string;
@@ -51,7 +51,7 @@ export async function getOrders(db: DB, query: GetOrdersQuery) {
   };
 }
 
-export async function getOrder(db: DB, orderId: string) {
+export async function getOrder(db: DB, orderId: number) {
   const [order] = await db
     .select()
     .from(orders)
@@ -61,7 +61,7 @@ export async function getOrder(db: DB, orderId: string) {
   return order ?? null;
 }
 
-export async function getOrderEvents(db: DB, orderId: string) {
+export async function getOrderEvents(db: DB, orderId: number) {
   return db
     .select()
     .from(orderEvents)
