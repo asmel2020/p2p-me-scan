@@ -13,7 +13,7 @@ import { persistEvent } from "./db/store";
 import { setLastBlock } from "./db/state";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import * as schema from "@p2p-me/db";
-//dsad
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const LOG_FILE = path.resolve(__dirname, "rpc-errors-catchup.log");
@@ -55,6 +55,8 @@ function createClient(url: string) {
 
 const clients = RPC_URLS.map(createClient);
 const failedChunks: string[] = [];
+const persistErrors: string[] = [];
+const PERSIST_CONCURRENCY = 3; // inserts simultáneos a D1
 
 async function fetchBlockTimestampSafe(
   blockNumber: bigint,
@@ -80,6 +82,35 @@ async function fetchBlockTimestampSafe(
     await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
   }
   return null;
+}
+
+async function persistEventsWithLimit(
+  db: DrizzleD1Database<typeof schema>,
+  events: ChainEvent[],
+): Promise<void> {
+  let idx = 0;
+  function takeNextEvent() {
+    if (idx >= events.length) return null;
+    return events[idx++];
+  }
+
+  async function persistWorker() {
+    while (true) {
+      const event = takeNextEvent();
+      if (!event) break;
+      try {
+        await persistEvent(db, event);
+      } catch (err) {
+        const msg = (err as any)?.message ?? (err as any)?.cause ?? String(err);
+        persistErrors.push(`Order ${event.orderId} (block ${event.blockNumber}): ${msg}`);
+        logRpcError("d1-persist", `Order ${event.orderId} block ${event.blockNumber}`, err);
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(PERSIST_CONCURRENCY, events.length) }, () => persistWorker()),
+  );
 }
 
 async function processChunk(
@@ -250,7 +281,6 @@ export async function fastCatchup(
 
   let processedChunks = 0;
   let totalEvents = 0;
-  let failedBlocks: string[] = [];
   const startTime = Date.now();
 
   const progressTimer = setInterval(() => {
@@ -277,7 +307,7 @@ export async function fastCatchup(
         if (!chunk) break;
         const events = await processChunk(chunk.from, chunk.to, clientIndex);
         if (events.length > 0) {
-          await Promise.all(events.map((e) => persistEvent(db, e)));
+          await persistEventsWithLimit(db, events);
         }
         processedChunks++;
         totalEvents += events.length;
@@ -299,6 +329,16 @@ export async function fastCatchup(
     console.log(`\nBloques fallidos (${failedChunks.length}):`);
     for (const f of failedChunks) {
       console.log(`  - ${f}`);
+    }
+    console.log(`  (detalles en ${LOG_FILE})`);
+  }
+  if (persistErrors.length > 0) {
+    console.log(`\nErrores de persistencia (${persistErrors.length}):`);
+    for (const e of persistErrors.slice(0, 10)) {
+      console.log(`  - ${e}`);
+    }
+    if (persistErrors.length > 10) {
+      console.log(`  ... y ${persistErrors.length - 10} más`);
     }
     console.log(`  (detalles en ${LOG_FILE})`);
   }
