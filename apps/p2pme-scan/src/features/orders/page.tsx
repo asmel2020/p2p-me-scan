@@ -23,6 +23,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import type { Order } from "./types";
+import { Button } from "@base-ui/react";
 
 function FilterGroup({
   label,
@@ -50,14 +51,21 @@ function FilterGroup({
 }
 
 export function OrdersPage() {
-  const { cursor, limit: rawLimit, orderId: urlOrderId } = useSearch({ from: "/" });
+  const {
+    cursor,
+    limit: rawLimit,
+    orderId: urlOrderId,
+  } = useSearch({ from: "/" });
   const limit = rawLimit ?? 25;
   const navigate = useNavigate();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [currencyFilter, setCurrencyFilter] = useState("");
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(null);
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(
+    null,
+  );
+  const [dialogOpen, setDialogOpen] = useState(false);
   const cursorHistory = useRef<string[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
 
@@ -118,11 +126,18 @@ export function OrdersPage() {
     ...(typeFilter ? { orderType: typeFilter } : {}),
     ...(currencyFilter ? { currency: currencyFilter } : {}),
     ...(dateRange
-      ? { fromDate: toLocalDateStr(dateRange.from), toDate: toLocalDateStr(dateRange.to) }
+      ? {
+          fromDate: toLocalDateStr(dateRange.from),
+          toDate: toLocalDateStr(dateRange.to),
+        }
       : {}),
   };
 
-  const { data, isFetching, refetch: refetchOrders } = useQuery({
+  const {
+    data,
+    isFetching,
+    refetch: refetchOrders,
+  } = useQuery({
     queryKey: [
       "orders-page",
       cursor,
@@ -155,7 +170,10 @@ export function OrdersPage() {
   const { data: stats, refetch: refetchStats } = useStats({
     ...(currencyFilter ? { currency: currencyFilter } : {}),
     ...(dateRange
-      ? { fromDate: toLocalDateStr(dateRange.from), toDate: toLocalDateStr(dateRange.to) }
+      ? {
+          fromDate: toLocalDateStr(dateRange.from),
+          toDate: toLocalDateStr(dateRange.to),
+        }
       : {}),
   });
   const totalUsdc =
@@ -183,6 +201,14 @@ export function OrdersPage() {
     setDateRange({ from, to });
     cursorHistory.current = [];
     goToPage(undefined);
+    setDialogOpen(false);
+  };
+
+  const handleResetRange = () => {
+    setDateRange(null);
+    cursorHistory.current = [];
+    goToPage(undefined);
+    setDialogOpen(false);
   };
 
   const handleLimitChange = (value: string | null) => {
@@ -380,7 +406,7 @@ export function OrdersPage() {
           </Select>
         </FilterGroup>
 
-        <Dialog>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger
             style={{
               background: "var(--color-muted)",
@@ -423,6 +449,15 @@ export function OrdersPage() {
               }}
             >
               <DatePickerWithRange onApply={handleDateRangeChange} />
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                marginTop: "0.75rem",
+              }}
+            >
+              <Button onClick={handleResetRange}>Reset</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -495,7 +530,7 @@ export function OrdersPage() {
               })}
             </span>
           )}
-          </div>
+        </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <button
             onClick={handlePrev}
