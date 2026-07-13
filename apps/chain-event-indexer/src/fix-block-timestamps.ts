@@ -1,11 +1,16 @@
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import { eq, count } from "drizzle-orm";
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
 import { initRemoteDB } from "@p2p-me/db/client";
 import * as schema from "@p2p-me/db";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const LOG_FILE = path.resolve(__dirname, "rpc-errors.log");
 
 const envPath = path.resolve(process.cwd(), "../../.env");
 if (fs.existsSync(envPath)) {
@@ -30,29 +35,26 @@ if (
 /*  RPCs                                                                      */
 /* -------------------------------------------------------------------------- */
 
-const RPC_URLS = [
-  "https://mainnet.base.org",
-  "https://8453.rpc.thirdweb.com",
-  "https://rpc.nodeflare.app/base/public",
-  "https://developer-access-mainnet.base.org",
-  "https://base.public.blockpi.network/v1/rpc/public",
-  "https://base-public.nodies.app",
-  "https://base.meowrpc.com",
-  "https://base-mainnet.public.blastapi.io",
-  "https://base.gateway.tenderly.co",
-  "https://gateway.tenderly.co/public/base",
-  "https://base-rpc.publicnode.com",
-  "https://base.drpc.org",
-  "https://base-mainnet.gateway.tatum.io",
-  "https://api.zan.top/base-mainnet",
-  "https://base.lava.build",
-  "https://rpc.owlracle.info/base/70d38ce1826c4a60bb2a8e05a6c8b20f",
-  "https://base.api.pocket.network",
-  "https://base.rpc.blxrbdn.com",
-  "https://api-base-mainnet-archive.n.dwellir.com/2ccf18bf-2916-4198-8856-42172854353c",
-  "https://base.rpc.sentio.xyz",
-  "https://rpc.baseazul.dev",
+const RPC_CONFIG = [
+  {
+    url: "https://rpc.ankr.com/base/e487627c09ac093cbf96da8b4661adbda413391c1824c0c09a8bb1ad314bdd06",
+    concurrency: 25,
+  },
+  {
+    url: "https://rpc.ankr.com/base/285e771bfe6acaa6bb6e61aff95927f087f0a7b06d4b5c8be826e44914d49ec4",
+    concurrency: 25,
+  },
+  {
+    url: "https://rpc.ankr.com/base/277bb99f6262d8fc43f35b8c9e78858bcbbea4184dbf49cdc1a960429a76128d",
+    concurrency: 25,
+  },
+  /*  {
+    url: "https://rpc.ankr.com/base/9676e91ab178d118be498a3fa0f25ea5499e26bbfa8126ec2b1119d0238b4e02",
+    concurrency: 25,
+  }, */
+  { url: "https://mainnet.base.org", concurrency: 8 },
 ];
+const RPC_URLS = RPC_CONFIG.map((c) => c.url);
 
 function createClient(url: string) {
   return createPublicClient({
@@ -61,19 +63,28 @@ function createClient(url: string) {
   });
 }
 
+function logRpcError(
+  rpcUrl: string,
+  blockNum: number,
+  err: unknown,
+  phase: string,
+) {
+  const msg =
+    (err as any)?.message ??
+    (err as any)?.shortMessage ??
+    (err as any)?.cause ??
+    String(err);
+  const line = `[${new Date().toISOString()}] [${phase}] RPC: ${rpcUrl} | Block: ${blockNum} | Error: ${msg}\n`;
+  fs.appendFileSync(LOG_FILE, line);
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Config                                                                     */
 /* -------------------------------------------------------------------------- */
 
-const PER_RPC_CONCURRENCY = 5; // peticiones paralelas por RPC
-
 /* -------------------------------------------------------------------------- */
 /*  Cola de trabajo                                                           */
 /* -------------------------------------------------------------------------- */
-
-interface QueueResult {
-  updated: number;
-}
 
 let globalProgress = 0;
 let globalTotal = 0;
@@ -119,50 +130,64 @@ function stopProgressReporter() {
   process.stdout.write("\r");
 }
 
-async function runQueue(
+async function runSharedQueue(
   blocks: number[],
-  rpcUrl: string,
   db: ReturnType<typeof initRemoteDB>,
   failedBlocks: number[],
   rpcErrors: Map<string, number>,
-): Promise<QueueResult> {
-  const client = createClient(rpcUrl);
+): Promise<number> {
+  let idx = 0;
   let updated = 0;
 
-  for (let i = 0; i < blocks.length; i += PER_RPC_CONCURRENCY) {
-    const batch = blocks.slice(i, i + PER_RPC_CONCURRENCY);
-    await Promise.allSettled(
-      batch.map(async (blockNum) => {
-        try {
-          const ts = await fetchBlockTimestamp(client, blockNum);
-          if (ts === null) throw new Error("no timestamp");
-          await updateBlockTimestamps(db, blockNum, ts);
-          updated++;
-        } catch {
-          failedBlocks.push(blockNum);
-          rpcErrors.set(rpcUrl, (rpcErrors.get(rpcUrl) ?? 0) + 1);
-        } finally {
-          globalProgress++;
-        }
-      }),
-    );
+  async function worker(rpcUrl: string) {
+    const client = createClient(rpcUrl);
+    while (true) {
+      const blockNum = takeNext();
+      if (blockNum === null) break;
+      try {
+        const ts = await fetchBlockTimestamp(client, blockNum);
+        await updateBlockTimestamps(db, blockNum, ts);
+        updated++;
+      } catch (err) {
+        failedBlocks.push(blockNum);
+        rpcErrors.set(rpcUrl, (rpcErrors.get(rpcUrl) ?? 0) + 1);
+        logRpcError(rpcUrl, blockNum, err, "first-pass");
+      } finally {
+        globalProgress++;
+      }
+    }
   }
 
-  return { updated };
+  function takeNext(): number | null {
+    if (idx >= blocks.length) return null;
+    return blocks[idx++];
+  }
+
+  const workers: Promise<void>[] = [];
+  for (const { url, concurrency } of RPC_CONFIG) {
+    for (let i = 0; i < concurrency; i++) {
+      workers.push(worker(url));
+    }
+  }
+  await Promise.all(workers);
+  return updated;
 }
 
 async function fetchBlockTimestamp(
   client: any,
   blockNum: number,
-): Promise<number | null> {
+): Promise<number> {
+  let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const block = (await client.getBlock({
         blockNumber: BigInt(blockNum),
       })) as any;
       if (block) return Number(block.timestamp);
-    } catch (err: any) {
-      const msg = err?.message ?? err?.shortMessage ?? "unknown";
+    } catch (err) {
+      lastError = err;
+      const msg =
+        (err as any)?.message ?? (err as any)?.shortMessage ?? "unknown";
       if (
         msg.includes("rate limit") ||
         msg.includes("429") ||
@@ -177,7 +202,7 @@ async function fetchBlockTimestamp(
       }
     }
   }
-  return null;
+  throw lastError ?? new Error("no timestamp");
 }
 
 /* -------------------------------------------------------------------------- */
@@ -196,33 +221,48 @@ async function reprocessFailed(
     `\nReprocesando ${failedBlocks.length} bloques fallidos con todos los RPCs...`,
   );
 
+  let idx = 0;
   let recovered = 0;
   const stillFailing: number[] = [];
 
-  for (const blockNum of failedBlocks) {
-    let success = false;
-    for (let attempt = 0; attempt < 5 && !success; attempt++) {
-      for (let ci = 0; ci < ALL_CLIENTS.length && !success; ci++) {
-        try {
-          const ts = await fetchBlockTimestamp(ALL_CLIENTS[ci], blockNum);
-          if (ts !== null) {
+  async function reprocessWorker() {
+    while (true) {
+      const blockNum = takeNext();
+      if (blockNum === null) break;
+
+      let success = false;
+      for (let attempt = 0; attempt < 5 && !success; attempt++) {
+        for (let ci = 0; ci < ALL_CLIENTS.length && !success; ci++) {
+          try {
+            const ts = await fetchBlockTimestamp(ALL_CLIENTS[ci], blockNum);
             await updateBlockTimestamps(db, blockNum, ts);
             recovered++;
             success = true;
+          } catch (err) {
+            logRpcError(RPC_URLS[ci], blockNum, err, "reprocess");
           }
-        } catch {
-          // next client
+        }
+        if (!success) {
+          await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
         }
       }
       if (!success) {
-        await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
+        stillFailing.push(blockNum);
       }
+      globalProgress++;
     }
-    if (!success) {
-      stillFailing.push(blockNum);
-    }
-    globalProgress++;
   }
+
+  function takeNext(): number | null {
+    if (idx >= failedBlocks.length) return null;
+    return failedBlocks[idx++];
+  }
+
+  const totalWorkers = RPC_CONFIG.reduce((s, c) => s + c.concurrency, 0);
+  const reprocessWorkers = Math.min(totalWorkers, failedBlocks.length);
+  await Promise.all(
+    Array.from({ length: reprocessWorkers }, () => reprocessWorker()),
+  );
 
   failedBlocks.length = 0;
   failedBlocks.push(...stillFailing);
@@ -279,14 +319,6 @@ async function main() {
   const allBlocks = rows.map((r) => r.blockNumber);
   console.log(`Bloques únicos pendientes: ${totalBlocks}`);
   console.log(`RPCs disponibles: ${RPC_URLS.length}`);
-  console.log(
-    `Bloques por cola: ~${Math.ceil(totalBlocks / RPC_URLS.length)}\n`,
-  );
-
-  const queues: number[][] = Array.from({ length: RPC_URLS.length }, () => []);
-  for (let i = 0; i < allBlocks.length; i++) {
-    queues[i % RPC_URLS.length].push(allBlocks[i]);
-  }
 
   const failedBlocks: number[] = [];
   const rpcErrors = new Map<string, number>();
@@ -299,27 +331,17 @@ async function main() {
   const startTime = Date.now();
   startProgressReporter();
 
-  console.log(
-    `Colas: ${RPC_URLS.length} | Concurrencia por RPC: ${PER_RPC_CONCURRENCY}`,
-  );
-  console.log(
-    `Total paralelismo: ${RPC_URLS.length * PER_RPC_CONCURRENCY} requests simultáneas\n`,
-  );
+  console.log(`Workers pool compartido:`);
+  for (const { url, concurrency } of RPC_CONFIG) {
+    const short = url.replace(/https?:\/\//, "").slice(0, 45);
+    console.log(`  ${String(concurrency).padStart(2)} workers → ${short}`);
+  }
+  const totalWorkers = RPC_CONFIG.reduce((s, c) => s + c.concurrency, 0);
+  console.log(`  Total: ${totalWorkers} requests simultáneas\n`);
 
-  const results = await Promise.allSettled(
-    queues.map((queue, i) => {
-      if (queue.length === 0) return Promise.resolve({ updated: 0 });
-      return runQueue(queue, RPC_URLS[i], db, failedBlocks, rpcErrors);
-    }),
-  );
+  totalUpdated = await runSharedQueue(allBlocks, db, failedBlocks, rpcErrors);
 
   stopProgressReporter();
-
-  for (const r of results) {
-    if (r.status === "fulfilled") {
-      totalUpdated += r.value.updated;
-    }
-  }
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`\nPrimera pasada completada en ${elapsed}s`);
@@ -346,7 +368,7 @@ async function main() {
   }
 
   if (rpcErrors.size > 0) {
-    console.log(`\n  Errores por RPC (concurrencia ${PER_RPC_CONCURRENCY}):`);
+    console.log(`\n  Errores por RPC:`);
     const sorted = [...rpcErrors.entries()].sort((a, b) => b[1] - a[1]);
     for (const [url, count] of sorted) {
       const short = url.replace(/https?:\/\//, "").slice(0, 50);

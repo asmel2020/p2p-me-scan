@@ -35,7 +35,7 @@ const API_TOKEN = CLOUDFLARE_API_TOKEN!;
 
 const publicClient = createPublicClient({
   transport: http(
-    "https://open-platform.nodereal.io/7ec788841b9f40b68f6388040bca2a68/base",
+    "https://rpc.ankr.com/base/9676e91ab178d118be498a3fa0f25ea5499e26bbfa8126ec2b1119d0238b4e02",
   ),
 });
 

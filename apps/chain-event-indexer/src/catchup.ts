@@ -1,15 +1,47 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
-import { decodeLog, ORDER_EVENT_ABI, DIAMOND_ADDRESS, type ChainEvent } from "./events";
+import {
+  decodeLog,
+  ORDER_EVENT_ABI,
+  DIAMOND_ADDRESS,
+  type ChainEvent,
+} from "./events";
 import { persistEvent } from "./db/store";
 import { setLastBlock } from "./db/state";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import * as schema from "@p2p-me/db";
 
-const RPC_URLS = ["https://mainnet.base.org", "https://8453.rpc.thirdweb.com"];
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const LOG_FILE = path.resolve(__dirname, "rpc-errors-catchup.log");
+
+function logRpcError(rpcUrl: string, context: string, err: unknown) {
+  const msg =
+    (err as any)?.message ??
+    (err as any)?.shortMessage ??
+    (err as any)?.cause ??
+    String(err);
+  const line = `[${new Date().toISOString()}] [catchup] RPC: ${rpcUrl} | ${context} | Error: ${msg}\n`;
+  fs.appendFileSync(LOG_FILE, line);
+}
+
+const RPC_CONFIG = [
+  { url: "https://rpc.ankr.com/base/9676e91ab178d118be498a3fa0f25ea5499e26bbfa8126ec2b1119d0238b4e02", concurrency: 10 },
+  { url: "https://mainnet.base.org", concurrency: 5 },
+  { url: "https://8453.rpc.thirdweb.com", concurrency: 5 },
+];
+const RPC_URLS = RPC_CONFIG.map((c) => c.url);
 const CHUNK_SIZE = 800n;
-const CONCURRENCY = 20;
-const CHECKPOINT_INTERVAL = 5;
+
+const poolIndices: number[] = [];
+for (let i = 0; i < RPC_CONFIG.length; i++) {
+  for (let j = 0; j < RPC_CONFIG[i].concurrency; j++) {
+    poolIndices.push(i);
+  }
+}
 
 function createClient(url: string) {
   return createPublicClient({
@@ -19,12 +51,15 @@ function createClient(url: string) {
 }
 
 const clients = RPC_URLS.map(createClient);
+const failedChunks: string[] = [];
 
-async function fetchBlockTimestampSafe(blockNumber: bigint): Promise<number | null> {
+async function fetchBlockTimestampSafe(
+  blockNumber: bigint,
+): Promise<number | null> {
   for (let attempt = 0; attempt < 3; attempt++) {
     for (let ci = 0; ci < clients.length; ci++) {
       try {
-        const block = await clients[ci].getBlock({ blockNumber }) as any;
+        const block = (await clients[ci].getBlock({ blockNumber })) as any;
         return Number(block.timestamp);
       } catch (err: any) {
         const isRateLimit =
@@ -32,11 +67,14 @@ async function fetchBlockTimestampSafe(blockNumber: bigint): Promise<number | nu
           err.message?.includes("429") ||
           err.message?.includes("over rate limit");
         if (isRateLimit) {
-          await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+          await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+        }
+        if (attempt === 2 && ci === clients.length - 1) {
+          logRpcError(RPC_URLS[ci], `Block: ${blockNumber}`, err);
         }
       }
     }
-    await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+    await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
   }
   return null;
 }
@@ -65,11 +103,16 @@ async function processChunk(
         if (e) decoded.push(e);
       }
 
-      const uniqueBlocks = [...new Set(decoded.map((e) => e.blockNumber))].sort((a, b) => a - b);
+      const uniqueBlocks = [...new Set(decoded.map((e) => e.blockNumber))].sort(
+        (a, b) => a - b,
+      );
       const blockTimestamps = new Map<string, number>();
 
       const tsResults = await Promise.allSettled(
-        uniqueBlocks.map(async (bn) => ({ bn, ts: await fetchBlockTimestampSafe(BigInt(bn)) })),
+        uniqueBlocks.map(async (bn) => ({
+          bn,
+          ts: await fetchBlockTimestampSafe(BigInt(bn)),
+        })),
       );
       for (const r of tsResults) {
         if (r.status === "fulfilled" && r.value.ts !== null) {
@@ -85,7 +128,10 @@ async function processChunk(
         for (let offset = 1; offset <= uniqueBlocks.length; offset++) {
           const nextBn = uniqueBlocks[i + offset];
           const prevBn = uniqueBlocks[i - offset];
-          if (i + offset < uniqueBlocks.length && blockTimestamps.has(nextBn.toString())) {
+          if (
+            i + offset < uniqueBlocks.length &&
+            blockTimestamps.has(nextBn.toString())
+          ) {
             estimatedTs = blockTimestamps.get(nextBn.toString())! - offset * 2;
             break;
           }
@@ -97,13 +143,19 @@ async function processChunk(
 
         if (estimatedTs > 0) {
           blockTimestamps.set(bn.toString(), estimatedTs);
-          console.warn(`    Timestamp estimado para bloque ${bn}: ${estimatedTs}`);
+          console.warn(
+            `    Timestamp estimado para bloque ${bn}: ${estimatedTs}`,
+          );
         } else {
-          console.warn(`    Bloque ${bn} sin timestamp — omitiendo ${decoded.filter(e => e.blockNumber === bn).length} eventos`);
+          console.warn(
+            `    Bloque ${bn} sin timestamp — omitiendo ${decoded.filter((e) => e.blockNumber === bn).length} eventos`,
+          );
         }
       }
 
-      const validDecoded = decoded.filter((e) => blockTimestamps.has(e.blockNumber.toString()));
+      const validDecoded = decoded.filter((e) =>
+        blockTimestamps.has(e.blockNumber.toString()),
+      );
       for (const e of validDecoded) {
         const ts = blockTimestamps.get(e.blockNumber.toString())!;
         e.blockTimestampUnix = ts;
@@ -137,7 +189,10 @@ async function processChunk(
       }
 
       if (fromBlock === toBlock) {
-        console.error(`  Bloque irrecuperable ${fromBlock}: ${err.message ?? "error"}`);
+        const msg = err.message ?? "error";
+        console.error(`  Bloque irrecuperable ${fromBlock}: ${msg}`);
+        logRpcError(RPC_URLS[clientIndex], `Block irrecuperable: ${fromBlock}`, err);
+        failedChunks.push(`Bloque ${fromBlock}`);
         return [];
       }
 
@@ -159,7 +214,9 @@ export async function fastCatchup(
   toBlock: bigint,
 ): Promise<void> {
   const totalBlocks = toBlock - fromBlock + 1n;
-  console.log(`\n=== CATCHUP: ${fromBlock} → ${toBlock} (${totalBlocks} bloques) ===`);
+  console.log(
+    `\n=== CATCHUP: ${fromBlock} → ${toBlock} (${totalBlocks} bloques) ===`,
+  );
 
   const chunks: { from: bigint; to: bigint }[] = [];
   for (let b = fromBlock; b <= toBlock; b += CHUNK_SIZE) {
@@ -167,51 +224,79 @@ export async function fastCatchup(
     chunks.push({ from: b, to: end });
   }
 
-  console.log(`  ${chunks.length} chunks de ${CHUNK_SIZE} bloques (concurrencia: ${CONCURRENCY})`);
+  const totalWorkers = poolIndices.length;
+  console.log(
+    `  ${chunks.length} chunks de ${CHUNK_SIZE} bloques (workers: ${totalWorkers})`,
+  );
+  console.log(`  Pool de workers:`);
+  for (const { url, concurrency } of RPC_CONFIG) {
+    const short = url.replace(/https?:\/\//, "").slice(0, 45);
+    console.log(`    ${String(concurrency).padStart(2)} workers → ${short}`);
+  }
   console.log("  Procesando...");
 
-  const startTime = Date.now();
-  let totalEvents = 0;
+  let chunkIdx = 0;
+  function takeNextChunk() {
+    if (chunkIdx >= chunks.length) return null;
+    return chunks[chunkIdx++];
+  }
+
   let processedChunks = 0;
+  let totalEvents = 0;
+  let failedBlocks: string[] = [];
+  const startTime = Date.now();
 
-  for (let i = 0; i < chunks.length; i += CONCURRENCY) {
-    const batch = chunks.slice(i, i + CONCURRENCY);
-    const results = await Promise.all(
-      batch.map((chunk, idx) =>
-        new Promise((resolve) => setTimeout(resolve, idx * 100)).then(() =>
-          processChunk(chunk.from, chunk.to, idx % RPC_URLS.length),
-        ),
-      ),
-    );
-
-    for (const events of results) {
-      if (events.length > 0) {
-        await Promise.all(events.map((e) => persistEvent(db, e)));
-        totalEvents += events.length;
-      }
-    }
-
-    processedChunks += batch.length;
+  const progressTimer = setInterval(() => {
     const elapsed = (Date.now() - startTime) / 1000;
     const pct = ((processedChunks / chunks.length) * 100).toFixed(1);
-    const avgPerChunk = elapsed / processedChunks;
+    const avgPerChunk = elapsed / Math.max(1, processedChunks);
     const remaining = Math.round(avgPerChunk * (chunks.length - processedChunks));
-    const eta = remaining >= 60
-      ? `${Math.floor(remaining / 60)}m ${remaining % 60}s`
-      : `${remaining}s`;
+    const fmtRemaining =
+      remaining >= 60
+        ? `${Math.floor(remaining / 60)}m ${remaining % 60}s`
+        : `${remaining}s`;
 
-    console.log(
-      `  Progreso: ${processedChunks}/${chunks.length} chunks (${pct}%) | Eventos: ${totalEvents} | ${elapsed}s | ETA: ${eta}`,
+    process.stdout.write(
+      `\r  Progreso: ${processedChunks}/${chunks.length} chunks (${pct}%) | Eventos: ${totalEvents} | ${fmtTime(elapsed)} | ETA: ${fmtRemaining}     `,
     );
+  }, 1000);
 
-    if (processedChunks % CHECKPOINT_INTERVAL === 0) {
-      const lastProcessedBlock = batch[batch.length - 1].to;
-      await setLastBlock(db, lastProcessedBlock);
-    }
-  }
+  await Promise.all(
+    poolIndices.map(async (clientIndex) => {
+      while (true) {
+        const chunk = takeNextChunk();
+        if (!chunk) break;
+        const events = await processChunk(chunk.from, chunk.to, clientIndex);
+        if (events.length > 0) {
+          await Promise.all(events.map((e) => persistEvent(db, e)));
+        }
+        processedChunks++;
+        totalEvents += events.length;
+      }
+    }),
+  );
+
+  clearInterval(progressTimer);
+  process.stdout.write("\r");
 
   await setLastBlock(db, toBlock);
 
   const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log(`=== CATCHUP COMPLETADO en ${totalTime}s — ${totalEvents} eventos ===\n`);
+  console.log(`\n=== CATCHUP COMPLETADO en ${totalTime}s — ${totalEvents} eventos ===`);
+
+  if (failedChunks.length > 0) {
+    console.log(`\nBloques fallidos (${failedChunks.length}):`);
+    for (const f of failedChunks) {
+      console.log(`  - ${f}`);
+    }
+    console.log(`  (detalles en ${LOG_FILE})`);
+  }
+  console.log("");
+}
+
+function fmtTime(seconds: number): string {
+  if (seconds < 60) return `${seconds.toFixed(0)}s`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}m ${s}s`;
 }
