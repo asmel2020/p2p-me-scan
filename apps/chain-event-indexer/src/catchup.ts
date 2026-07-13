@@ -279,26 +279,8 @@ export async function fastCatchup(
     return chunks[chunkIdx++];
   }
 
-  let processedChunks = 0;
   let totalEvents = 0;
   const startTime = Date.now();
-
-  const progressTimer = setInterval(() => {
-    const elapsed = (Date.now() - startTime) / 1000;
-    const pct = ((processedChunks / chunks.length) * 100).toFixed(1);
-    const avgPerChunk = elapsed / Math.max(1, processedChunks);
-    const remaining = Math.round(
-      avgPerChunk * (chunks.length - processedChunks),
-    );
-    const fmtRemaining =
-      remaining >= 60
-        ? `${Math.floor(remaining / 60)}m ${remaining % 60}s`
-        : `${remaining}s`;
-
-    process.stdout.write(
-      `\r  Progreso: ${processedChunks}/${chunks.length} chunks (${pct}%) | Eventos: ${totalEvents} | ${fmtTime(elapsed)} | ETA: ${fmtRemaining}     `,
-    );
-  }, 1000);
 
   await Promise.all(
     poolIndices.map(async (clientIndex) => {
@@ -309,14 +291,10 @@ export async function fastCatchup(
         if (events.length > 0) {
           await persistEventsWithLimit(db, events);
         }
-        processedChunks++;
         totalEvents += events.length;
       }
     }),
   );
-
-  clearInterval(progressTimer);
-  process.stdout.write("\r");
 
   await setLastBlock(db, toBlock);
 
@@ -343,11 +321,4 @@ export async function fastCatchup(
     console.log(`  (detalles en ${LOG_FILE})`);
   }
   console.log("");
-}
-
-function fmtTime(seconds: number): string {
-  if (seconds < 60) return `${seconds.toFixed(0)}s`;
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}m ${s}s`;
 }
