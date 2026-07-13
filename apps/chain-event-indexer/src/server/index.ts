@@ -21,7 +21,7 @@ async function main() {
   let startBlock: bigint | undefined;
 
   if (savedBlock) {
-    startBlock = savedBlock + 1n;
+    startBlock = savedBlock - 10n;
     console.log(`Reanudando desde el bloque ${savedBlock}`);
   } else {
     const current = await publicClient.getBlockNumber();
