@@ -211,16 +211,11 @@ export function AnalyticsPage() {
     const totalCompleted = filtered.reduce((s, d) => s + d.completedCount, 0);
     const periods = filtered.length;
     const avgVolume = totalVolume / periods;
-    const bestDay = filtered.reduce(
-      (best, d) => (d.usdcVolume > best.usdcVolume ? d : best),
-      filtered[0],
-    );
     return {
       totalVolume,
       totalFiat,
       totalCompleted,
       avgVolume,
-      bestDay,
       periods,
     };
   }, [filtered]);
@@ -257,11 +252,7 @@ export function AnalyticsPage() {
         >
           <StatCard
             label="Total Volume"
-            value={
-              currencyFilter !== "all"
-                ? `${stats.totalVolume.toLocaleString()} USDC`
-                : `${(stats.totalVolume / 1000).toFixed(1)}k USDC`
-            }
+            value={`${stats.totalVolume.toLocaleString()} USDC`}
           />
           {currencyFilter !== "all" && (
             <StatCard
@@ -278,11 +269,6 @@ export function AnalyticsPage() {
             label="Completed Orders"
             value={stats.totalCompleted.toLocaleString()}
             subtitle={`${stats.periods} periods`}
-          />
-          <StatCard
-            label="Best Period"
-            value={stats.bestDay.usdcVolume.toLocaleString()}
-            subtitle={parseLocalDate(stats.bestDay.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
           />
         </div>
       )}

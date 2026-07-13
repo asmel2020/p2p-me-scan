@@ -50,7 +50,8 @@ function FilterGroup({
 }
 
 export function OrdersPage() {
-  const { cursor, limit, orderId: urlOrderId } = useSearch({ from: "/" });
+  const { cursor, limit: rawLimit, orderId: urlOrderId } = useSearch({ from: "/" });
+  const limit = rawLimit ?? 25;
   const navigate = useNavigate();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
@@ -121,7 +122,7 @@ export function OrdersPage() {
       : {}),
   };
 
-  const { data, isFetching } = useQuery({
+  const { data, isFetching, refetch: refetchOrders } = useQuery({
     queryKey: [
       "orders-page",
       cursor,
@@ -137,9 +138,12 @@ export function OrdersPage() {
     },
   });
 
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
   useEffect(() => {
     if (data) {
       setNextCursor(data.nextCursor);
+      setLastUpdated(new Date());
     }
   }, [data]);
 
@@ -148,7 +152,7 @@ export function OrdersPage() {
   const hasNext = !!nextCursor;
   const currentPage = cursorHistory.current.length + 1;
 
-  const { data: stats } = useStats({
+  const { data: stats, refetch: refetchStats } = useStats({
     ...(currencyFilter ? { currency: currencyFilter } : {}),
     ...(dateRange
       ? { fromDate: toLocalDateStr(dateRange.from), toDate: toLocalDateStr(dateRange.to) }
@@ -202,6 +206,11 @@ export function OrdersPage() {
     const prev = cursorHistory.current.pop();
     goToPage(prev || undefined);
   };
+
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([refetchOrders(), refetchStats()]);
+    setLastUpdated(new Date());
+  }, [refetchOrders, refetchStats]);
 
   const currencies = [
     { code: "INR", label: "Indian Rupee" },
@@ -429,16 +438,64 @@ export function OrdersPage() {
       >
         <div
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
             fontSize: "0.8125rem",
             color: "var(--color-muted-foreground)",
           }}
         >
-          {!isFetching && orders.length > 0 && (
-            <span>
-              Page {currentPage} · {orders.length} orders
+          {lastUpdated && (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.375rem",
+              }}
+            >
+              <button
+                onClick={handleRefresh}
+                disabled={isFetching}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "transparent",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "var(--radius-lg)",
+                  padding: "0.25rem",
+                  cursor: isFetching ? "not-allowed" : "pointer",
+                  opacity: isFetching ? 0.5 : 1,
+                  color: "var(--color-foreground)",
+                  transition: "all 0.15s",
+                }}
+                title="Refresh"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  className={isFetching ? "animate-spin" : ""}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+              </button>
+              Last updated:{" "}
+              {lastUpdated.toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
             </span>
           )}
-        </div>
+          </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <button
             onClick={handlePrev}
@@ -522,6 +579,22 @@ export function OrdersPage() {
         onOrderClick={setSelectedOrder}
         isLoading={isFetching}
       />
+
+      {!isFetching && orders.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginTop: "0.75rem",
+            fontSize: "0.8125rem",
+            color: "var(--color-muted-foreground)",
+          }}
+        >
+          <span>
+            Page {currentPage} · {orders.length} orders
+          </span>
+        </div>
+      )}
 
       <OrderModal
         order={selectedOrder}

@@ -4,7 +4,7 @@ import { OrdersPage } from "@/features/orders/page";
 
 const searchSchema = z.object({
   cursor: z.string().optional(),
-  limit: z.coerce.number().optional(),
+  limit: z.coerce.number().default(25),
   orderId: z.coerce.number().optional(),
 });
 

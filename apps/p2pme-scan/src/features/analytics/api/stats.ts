@@ -51,15 +51,10 @@ export function getAvailableCurrencies(): string[] {
   return CURRENCIES;
 }
 
-function utcDateToLocal(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00Z");
-  return toLocalDateStr(d);
-}
-
 export async function fetchDailyTransferability(): Promise<DailyTransfer[]> {
   try {
     const { data } = await apiClient.get<DailyTransfer[]>('/analytics/daily-transferability');
-    if (data.length > 0) return data.map(d => ({ ...d, date: utcDateToLocal(d.date) }));
+    if (data.length > 0) return data;
     throw new Error("empty");
   } catch {
     await new Promise((r) => setTimeout(r, 300));

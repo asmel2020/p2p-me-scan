@@ -6,6 +6,5 @@ export function useStats(params?: StatsQueryParams) {
   return useQuery({
     queryKey: ['stats', params],
     queryFn: () => fetchStats(params),
-    refetchInterval: 10_000,
   });
 }

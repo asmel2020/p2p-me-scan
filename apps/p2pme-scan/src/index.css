@@ -75,8 +75,12 @@
     min-height: 100vh;
   }
 
-  ::selection {
-    background-color: var(--color-primary);
-    color: var(--color-primary-foreground);
-  }
+::selection {
+  background-color: var(--color-primary);
+  color: var(--color-primary-foreground);
+}
+
+#tv-attr-logo {
+  display: none !important;
+}
 }

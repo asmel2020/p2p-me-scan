@@ -7,6 +7,5 @@ export function useDailyTransferability() {
   return useQuery({
     queryKey: ['daily-transferability'],
     queryFn: fetchDailyTransferability,
-    refetchInterval: 30_000,
   });
 }
