@@ -8,6 +8,7 @@ import { fetchBlockEvents } from "./events";
 import { initRemoteDB } from "@p2p-me/db/client";
 import { persistEvent } from "./db/store";
 import { getLastBlock, setLastBlock } from "./db/state";
+import { fastCatchup } from "./catchup";
 
 const envPath = path.resolve(process.cwd(), "../../.env");
 if (fs.existsSync(envPath)) {
@@ -33,7 +34,9 @@ const DB_ID = CLOUDFLARE_DATABASE_ID!;
 const API_TOKEN = CLOUDFLARE_API_TOKEN!;
 
 const publicClient = createPublicClient({
-  transport: http("https://mainnet.base.org"),
+  transport: http(
+    "https://open-platform.nodereal.io/7ec788841b9f40b68f6388040bca2a68/base",
+  ),
 });
 
 const LOOKBACK = 1000n;
@@ -53,7 +56,16 @@ async function main() {
     console.log(`Sin estado guardado. Iniciando desde bloque ${startBlock}`);
   }
 
-  const poller = startBlockPoller(6000, startBlock);
+  const currentBlock = await publicClient.getBlockNumber();
+  const gap = currentBlock - startBlock;
+  const CATCHUP_THRESHOLD = 100n;
+
+  if (gap > CATCHUP_THRESHOLD) {
+    await fastCatchup(db, startBlock, currentBlock);
+    startBlock = currentBlock;
+  }
+
+  const poller = startBlockPoller(2000, startBlock);
 
   poller.onBlock(async (blockNumber) => {
     console.log(`Procesando bloque ${blockNumber}`);

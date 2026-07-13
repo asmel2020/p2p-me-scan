@@ -5,7 +5,8 @@ import { base } from "viem/chains";
 /*  Constantes de configuración                                               */
 /* -------------------------------------------------------------------------- */
 
-const RPC_URL = "https://8453.rpc.thirdweb.com";
+const RPC_URL =
+  "https://open-platform.nodereal.io/7ec788841b9f40b68f6388040bca2a68/base";
 const DIAMOND_ADDRESS = "0x4cad6eC90e65baBec9335cAd728DDC610c316368";
 
 /* -------------------------------------------------------------------------- */
@@ -297,4 +298,11 @@ export async function fetchBlockEvents(
     .filter((e: any): e is ChainEvent => e !== null);
 }
 
-export { ORDER_EVENT_ABI, EVENT_NAMES, DIAMOND_ADDRESS, RPC_URL, publicClient, decodeLog };
+export {
+  ORDER_EVENT_ABI,
+  EVENT_NAMES,
+  DIAMOND_ADDRESS,
+  RPC_URL,
+  publicClient,
+  decodeLog,
+};

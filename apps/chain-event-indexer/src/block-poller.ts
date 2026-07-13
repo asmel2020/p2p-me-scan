@@ -1,9 +1,11 @@
 import { createPublicClient, http } from "viem";
 import { base } from "viem/chains";
 
-const RPC_URLS = "https://mainnet.base.org,https://8453.rpc.thirdweb.com".split(
+const RPC_URLS = [
+  "https://open-platform.nodereal.io/7ec788841b9f40b68f6388040bca2a68/base",
+]; /* "https://mainnet.base.org,https://8453.rpc.thirdweb.com".split(
   ",",
-);
+); */
 
 let rpcIndex = 0;
 
