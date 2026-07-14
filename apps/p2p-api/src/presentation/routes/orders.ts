@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { eq, desc } from "drizzle-orm";
 import { initDB } from "@p2p-me/db/client";
+import { orders, orderEvents } from "@p2p-me/db";
 import { orderQuerySchema } from "../schemas";
-import { getOrders, getOrder, getOrderEvents } from "../../application/orders.service";
+import { getOrders } from "../../application/orders.service";
 import { encodeCursor, decodeCursor } from "../helpers/cursor";
 
 const app = new Hono<{ Bindings: { DB: D1Database } }>();
@@ -27,10 +29,16 @@ app.get("/:orderId", async (c) => {
   const db = initDB(c.env.DB);
   const orderId = Number(c.req.param("orderId"));
 
-  const order = await getOrder(db, orderId);
+  const [orderResult, events] = await db.batch([
+    db.select().from(orders).where(eq(orders.orderId, orderId)).limit(1),
+    db.select().from(orderEvents).where(eq(orderEvents.orderId, orderId))
+      .orderBy(desc(orderEvents.blockNumber), desc(orderEvents.logIndex))
+      .limit(5),
+  ]);
+
+  const order = orderResult[0] ?? null;
   if (!order) return c.json({ error: "Order not found" }, 404);
 
-  const events = await getOrderEvents(db, orderId);
   return c.json({ ...order, events });
 });
 
@@ -38,10 +46,16 @@ app.get("/:orderId/events", async (c) => {
   const db = initDB(c.env.DB);
   const orderId = Number(c.req.param("orderId"));
 
-  const order = await getOrder(db, orderId);
+  const [orderResult, events] = await db.batch([
+    db.select().from(orders).where(eq(orders.orderId, orderId)).limit(1),
+    db.select().from(orderEvents).where(eq(orderEvents.orderId, orderId))
+      .orderBy(desc(orderEvents.blockNumber), desc(orderEvents.logIndex))
+      .limit(5),
+  ]);
+
+  const order = orderResult[0] ?? null;
   if (!order) return c.json({ error: "Order not found" }, 404);
 
-  const events = await getOrderEvents(db, orderId);
   return c.json({ orderId, events, total: events.length });
 });
 

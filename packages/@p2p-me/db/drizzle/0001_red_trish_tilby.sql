@@ -1,0 +1,1 @@
+CREATE INDEX `idx_events_order_id_block_log` ON `order_events` (`order_id`,`block_number`,`log_index`);

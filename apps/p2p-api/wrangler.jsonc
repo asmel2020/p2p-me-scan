@@ -8,5 +8,11 @@
       "database_name": "chain-event-indexer",
       "database_id": "0d553189-68dc-4c23-9818-59c290e20fad"
     }
-  ]
+  ],
+  "observability": {
+    "logs": {
+      "enabled": false,
+      "invocation_logs": true
+    }
+  }
 }

@@ -66,5 +66,6 @@ export async function getOrderEvents(db: DB, orderId: number) {
     .select()
     .from(orderEvents)
     .where(eq(orderEvents.orderId, orderId))
-    .orderBy(desc(orderEvents.blockNumber), desc(orderEvents.logIndex));
+    .orderBy(desc(orderEvents.blockNumber), desc(orderEvents.logIndex))
+    .limit(5);
 }

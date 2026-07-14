@@ -59,6 +59,8 @@ export const orderEvents = sqliteTable("order_events", {
     .on(table.blockNumber, table.logIndex),
   txHashLogIndexUnique: uniqueIndex("idx_events_tx_hash_log_index_unique")
     .on(table.txHash, table.logIndex),
+  orderIdBlockLogIdx: index("idx_events_order_id_block_log")
+    .on(table.orderId, table.blockNumber, table.logIndex),
 }));
 
 export const processorState = sqliteTable("processor_state", {
