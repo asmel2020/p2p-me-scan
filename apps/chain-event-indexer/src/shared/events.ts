@@ -230,6 +230,9 @@ function decodeLog(log: Log): ChainEvent | null {
     const args = (log as any).args;
     if (args._order) {
       const order = args._order;
+      if (eventName === "OrderPlaced") {
+        console.log("OrderPlaced - assignedAccountNos:", order.assignedAccountNos);
+      }
       usdc = Number(order.amount) / 1e6;
       fiat = Number(order.fiatAmount) / 1e6;
       orderType =
