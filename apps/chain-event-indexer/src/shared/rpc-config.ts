@@ -18,7 +18,7 @@ export type RpcEntry = {
 
 export const RPC_CONFIG: RpcEntry[] = [
   {
-    url: "https://rpc.ankr.com/base/e487627c09ac093cbf96da8b4661adbda413391c1824c0c09a8bb1ad314bdd06",
+    url: "https://rpc.ankr.com/base/4d45a7170fc76ca5615185afb3ea6a638b69e95cb06961f92f72618b5c6ed080",
     concurrency: 25,
     maxInflight: 20,
   },
