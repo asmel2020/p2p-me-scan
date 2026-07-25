@@ -17,11 +17,11 @@ export type RpcEntry = {
 };
 
 export const RPC_CONFIG: RpcEntry[] = [
-  {
+  /* {
     url: "https://base-mainnet.g.alchemy.com/v2/pSMdFJAKA5ldsKRIaRpTMyWrCQVXpoXn",
     concurrency: 30,
     maxInflight: 10,
-  },
+  }, */
   {
     url: "https://rpc.ankr.com/base/4d45a7170fc76ca5615185afb3ea6a638b69e95cb06961f92f72618b5c6ed080",
     concurrency: 25,
