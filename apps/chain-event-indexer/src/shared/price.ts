@@ -1,5 +1,6 @@
 import { type Address } from "viem";
-import { publicClient, DIAMOND_ADDRESS } from "./events";
+import { DIAMOND_ADDRESS } from "./events";
+import { RPC_URLS, createClient } from "./rpc-config";
 
 /* -------------------------------------------------------------------------- */
 /*  Constantes                                                                */
@@ -101,26 +102,41 @@ function formatFiatPrice(raw: bigint): number {
 
 /**
  * Consulta getPriceConfig del contrato Diamond en un bloque específico.
- * Usa estado archive para obtener el precio exacto de ese bloque.
+ * Intenta con todos los RPCs disponibles antes de fallar.
  */
 export async function fetchPriceAtBlock(
   blockNumber: bigint,
   currencyHex: `0x${string}` = VEN_CURRENCY_HEX,
 ): Promise<PriceConfig> {
-  const result = await publicClient.readContract({
-    address: DIAMOND_ADDRESS as Address,
-    abi: GET_PRICE_CONFIG_ABI,
-    functionName: "getPriceConfig",
-    args: [currencyHex],
-    blockNumber,
-  });
+  let lastError: unknown;
 
-  return {
-    buyPrice: result.buyPrice,
-    sellPrice: result.sellPrice,
-    buyPriceOffset: result.buyPriceOffset,
-    baseSpread: result.baseSpread,
-  };
+  for (let i = 0; i < RPC_URLS.length; i++) {
+    try {
+      const client = createClient(RPC_URLS[i]);
+      const result = await client.readContract({
+        address: DIAMOND_ADDRESS as Address,
+        abi: GET_PRICE_CONFIG_ABI,
+        functionName: "getPriceConfig",
+        args: [currencyHex],
+        blockNumber,
+      });
+
+      return {
+        buyPrice: result.buyPrice,
+        sellPrice: result.sellPrice,
+        buyPriceOffset: result.buyPriceOffset,
+        baseSpread: result.baseSpread,
+      };
+    } catch (err) {
+      lastError = err;
+      const short = RPC_URLS[i].replace(/https?:\/\//, "").slice(0, 40);
+      console.warn(
+        `getPriceConfig falló en ${short}, probando siguiente RPC...`,
+      );
+    }
+  }
+
+  throw lastError;
 }
 
 /**
@@ -145,7 +161,7 @@ export async function fetchAllPricesAtBlock(
       });
     } catch (err) {
       console.error(
-        `Error obteniendo precio ${name} en bloque ${blockNumber}:`,
+        `Error obteniendo precio ${name} en bloque ${blockNumber} (todos los RPCs fallaron):`,
         (err as any)?.message ?? err,
       );
     }
@@ -155,3 +171,4 @@ export async function fetchAllPricesAtBlock(
 }
 
 export { CURRENCIES };
+
