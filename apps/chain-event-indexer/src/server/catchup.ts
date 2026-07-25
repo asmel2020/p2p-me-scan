@@ -84,30 +84,60 @@ async function persistEventsWithLimit(
   await Promise.all(
     Array.from({ length: Math.min(PERSIST_CONCURRENCY, events.length) }, () => persistWorker()),
   );
+}
 
-  // Indexar precios para los bloques únicos del chunk
-  const uniqueBlocks = [...new Set(events.map((e) => e.blockNumber))].sort((a, b) => a - b);
-  for (const bn of uniqueBlocks) {
-    const blockEvent = events.find((e) => e.blockNumber === bn);
-    if (!blockEvent) continue;
-    try {
-      const prices = await fetchAllPricesAtBlock(BigInt(bn));
-      if (prices.length > 0) {
-        await persistBlockPrices(
-          db,
-          bn,
-          prices,
-          blockEvent.blockTimestamp,
-          blockEvent.blockTimestampUnix,
-        );
-      }
-    } catch (err) {
-      console.error(
-        `Error indexando precio en bloque ${bn} (catchup):`,
-        (err as any)?.message ?? err,
-      );
+async function indexChunkPrices(
+  db: DrizzleD1Database<typeof schema>,
+  fromBlock: bigint,
+  toBlock: bigint,
+  events: ChainEvent[],
+): Promise<void> {
+  const eventsByBlock = new Map<number, ChainEvent>();
+  for (const e of events) {
+    if (!eventsByBlock.has(e.blockNumber)) {
+      eventsByBlock.set(e.blockNumber, e);
     }
   }
+
+  const blocksToProcess: bigint[] = [];
+  for (let b = fromBlock; b <= toBlock; b++) {
+    blocksToProcess.push(b);
+  }
+
+  let idx = 0;
+  async function priceWorker() {
+    while (idx < blocksToProcess.length) {
+      const bn = blocksToProcess[idx++];
+      if (!bn) break;
+      try {
+        const prices = await fetchAllPricesAtBlock(bn);
+        if (prices.length > 0) {
+          const numBn = Number(bn);
+          let isoTs = "";
+          let unixTs = 0;
+          if (eventsByBlock.has(numBn)) {
+            const ev = eventsByBlock.get(numBn)!;
+            isoTs = ev.blockTimestamp;
+            unixTs = ev.blockTimestampUnix;
+          } else {
+            unixTs = (await fetchBlockTimestampSafe(bn)) ?? 0;
+            isoTs = unixTs ? new Date(unixTs * 1000).toISOString() : "";
+          }
+          await persistBlockPrices(db, numBn, prices, isoTs, unixTs);
+        }
+      } catch (err) {
+        console.error(
+          `Error indexando precio en bloque ${bn} (catchup):`,
+          (err as any)?.message ?? err,
+        );
+      }
+    }
+  }
+
+  const concurrency = 3;
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, blocksToProcess.length) }, () => priceWorker()),
+  );
 }
 
 async function processChunk(
@@ -297,6 +327,7 @@ export async function fastCatchup(
             if (events.length > 0) {
               await persistEventsWithLimit(db, events);
             }
+            await indexChunkPrices(db, chunk.from, chunk.to, events);
             totalEvents += events.length;
           }
         })(),

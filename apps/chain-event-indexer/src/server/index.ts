@@ -13,7 +13,7 @@ const { accountId, databaseId, apiToken } = getCloudflareEnv();
 
 const publicClient = createClient(RPC_URLS[0]);
 
-const LOOKBACK = 1000n;
+const LOOKBACK = 2000n;
 const CATCHUP_THRESHOLD = 100n;
 
 async function main() {
@@ -48,27 +48,39 @@ async function main() {
       for (const e of events) {
         await persistEvent(db, e);
       }
+    }
 
-      // Indexar precio fiat del bloque exacto
-      const firstEvent = events[0];
-      try {
-        const prices = await fetchAllPricesAtBlock(blockNumber);
-        if (prices.length > 0) {
-          await persistBlockPrices(
-            db,
-            Number(blockNumber),
-            prices,
-            firstEvent.blockTimestamp,
-            firstEvent.blockTimestampUnix,
-          );
-        }
-      } catch (err) {
-        console.error(
-          `Error indexando precio en bloque ${blockNumber}:`,
-          (err as any)?.message ?? err,
+    // Indexar precio fiat de CADA bloque (tenga o no eventos)
+    try {
+      let blockTimestampIso = "";
+      let blockTimestampUnix = 0;
+
+      if (events.length > 0) {
+        blockTimestampIso = events[0].blockTimestamp;
+        blockTimestampUnix = events[0].blockTimestampUnix;
+      } else {
+        const block = await publicClient.getBlock({ blockNumber });
+        blockTimestampUnix = Number(block.timestamp);
+        blockTimestampIso = new Date(blockTimestampUnix * 1000).toISOString();
+      }
+
+      const prices = await fetchAllPricesAtBlock(blockNumber);
+      if (prices.length > 0) {
+        await persistBlockPrices(
+          db,
+          Number(blockNumber),
+          prices,
+          blockTimestampIso,
+          blockTimestampUnix,
         );
       }
+    } catch (err) {
+      console.error(
+        `Error indexando precio en bloque ${blockNumber}:`,
+        (err as any)?.message ?? err,
+      );
     }
+
     await setLastBlock(db, blockNumber);
   });
 
@@ -78,4 +90,3 @@ async function main() {
 }
 
 main().catch(console.error);
-
