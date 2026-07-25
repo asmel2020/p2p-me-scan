@@ -5,6 +5,7 @@ import {
   type ChainEvent,
 } from "../shared/events";
 import { persistEvent } from "../shared/db/store";
+import { persistBlockPrices } from "../shared/db/price-store";
 import { setLastBlock } from "../shared/db/state";
 import {
   RPC_CONFIG,
@@ -13,6 +14,7 @@ import {
   logRpcError,
   Semaphore,
 } from "../shared/rpc-config";
+import { fetchAllPricesAtBlock } from "../shared/price";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import * as schema from "@p2p-me/db";
 
@@ -82,6 +84,30 @@ async function persistEventsWithLimit(
   await Promise.all(
     Array.from({ length: Math.min(PERSIST_CONCURRENCY, events.length) }, () => persistWorker()),
   );
+
+  // Indexar precios para los bloques únicos del chunk
+  const uniqueBlocks = [...new Set(events.map((e) => e.blockNumber))].sort((a, b) => a - b);
+  for (const bn of uniqueBlocks) {
+    const blockEvent = events.find((e) => e.blockNumber === bn);
+    if (!blockEvent) continue;
+    try {
+      const prices = await fetchAllPricesAtBlock(BigInt(bn));
+      if (prices.length > 0) {
+        await persistBlockPrices(
+          db,
+          bn,
+          prices,
+          blockEvent.blockTimestamp,
+          blockEvent.blockTimestampUnix,
+        );
+      }
+    } catch (err) {
+      console.error(
+        `Error indexando precio en bloque ${bn} (catchup):`,
+        (err as any)?.message ?? err,
+      );
+    }
+  }
 }
 
 async function processChunk(

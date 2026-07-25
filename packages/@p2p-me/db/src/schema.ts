@@ -71,8 +71,31 @@ export const processorState = sqliteTable("processor_state", {
     .notNull(),
 });
 
+export const blockPrices = sqliteTable("block_prices", {
+  id: text("id").primaryKey(),
+  blockNumber: integer("block_number").notNull(),
+  currency: text("currency").notNull(),
+  currencyHex: text("currency_hex").notNull(),
+  buyPrice: real("buy_price").notNull(),
+  sellPrice: real("sell_price").notNull(),
+  buyPriceOffset: real("buy_price_offset").notNull(),
+  baseSpread: real("base_spread").notNull(),
+  blockTimestamp: text("block_timestamp").notNull().default(""),
+  blockTimestampUnix: integer("block_timestamp_unix").notNull().default(0),
+  createdAt: text("created_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
+}, (table) => ({
+  blockCurrencyUnique: uniqueIndex("idx_block_prices_block_currency")
+    .on(table.blockNumber, table.currency),
+  currencyIdx: index("idx_block_prices_currency")
+    .on(table.currency),
+}));
+
 export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;
 export type OrderEvent = typeof orderEvents.$inferSelect;
 export type NewOrderEvent = typeof orderEvents.$inferInsert;
 export type ProcessorState = typeof processorState.$inferSelect;
+export type BlockPrice = typeof blockPrices.$inferSelect;
+export type NewBlockPrice = typeof blockPrices.$inferInsert;

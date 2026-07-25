@@ -3,9 +3,11 @@ import { fetchBlockEvents } from "../shared/events";
 import { initRemoteDB } from "@p2p-me/db/client";
 import { persistEvent } from "../shared/db/store";
 import { getLastBlock, setLastBlock } from "../shared/db/state";
+import { persistBlockPrices } from "../shared/db/price-store";
 import { fastCatchup } from "./catchup";
 import { createClient, RPC_URLS } from "../shared/rpc-config";
 import { getCloudflareEnv } from "../shared/env";
+import { fetchAllPricesAtBlock } from "../shared/price";
 
 const { accountId, databaseId, apiToken } = getCloudflareEnv();
 
@@ -46,6 +48,26 @@ async function main() {
       for (const e of events) {
         await persistEvent(db, e);
       }
+
+      // Indexar precio fiat del bloque exacto
+      const firstEvent = events[0];
+      try {
+        const prices = await fetchAllPricesAtBlock(blockNumber);
+        if (prices.length > 0) {
+          await persistBlockPrices(
+            db,
+            Number(blockNumber),
+            prices,
+            firstEvent.blockTimestamp,
+            firstEvent.blockTimestampUnix,
+          );
+        }
+      } catch (err) {
+        console.error(
+          `Error indexando precio en bloque ${blockNumber}:`,
+          (err as any)?.message ?? err,
+        );
+      }
     }
     await setLastBlock(db, blockNumber);
   });
@@ -56,3 +78,4 @@ async function main() {
 }
 
 main().catch(console.error);
+

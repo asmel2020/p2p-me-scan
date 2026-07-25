@@ -15,6 +15,20 @@
       "when": 1783987356116,
       "tag": "0001_red_trish_tilby",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785019356793,
+      "tag": "0002_careful_slapstick",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1785019660811,
+      "tag": "0003_daffy_pepper_potts",
+      "breakpoints": true
     }
   ]
 }
