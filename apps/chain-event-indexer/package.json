@@ -6,6 +6,7 @@
     "build": "tsc",
     "dev": "tsx watch src/server/index.ts",
     "start": "tsx src/server/index.ts",
+    "bot": "tsx src/arbitrage-bot/index.ts",
     "block-stats": "tsx src/local/block-stats.ts",
     "scan": "tsx src/local/scan-blocks.ts",
     "check-blocks": "tsx src/local/check-blocks.ts",

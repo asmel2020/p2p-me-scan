@@ -92,6 +92,25 @@ importers:
         specifier: ^4.110.0
         version: 4.110.0(@cloudflare/workers-types@5.20260711.1)
 
+  apps/p2p-arbitrage-bot:
+    dependencies:
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      viem:
+        specifier: ^2.55.0
+        version: 2.55.0(typescript@5.9.2)(zod@4.4.3)
+    devDependencies:
+      '@types/node':
+        specifier: ^26.1.1
+        version: 26.1.1
+      tsx:
+        specifier: ^4.23.0
+        version: 4.23.0
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+
   apps/p2pme-scan:
     dependencies:
       '@base-ui/react':

@@ -1,20 +1,31 @@
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 
-const envPath = path.resolve(process.cwd(), "../../.env");
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const candidates = [
+  path.resolve(__dirname, "../../../../.env"),
+  path.resolve(__dirname, "../../../.env"),
+  path.resolve(process.cwd(), "../../.env"),
+  path.resolve(process.cwd(), "../.env"),
+  path.resolve(process.cwd(), ".env"),
+];
+
+for (const p of candidates) {
+  if (fs.existsSync(p)) {
+    dotenv.config({ path: p, override: true });
+  }
 }
-
-const { CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_DATABASE_ID, CLOUDFLARE_API_TOKEN } =
-  process.env;
 
 export function getCloudflareEnv(): {
   accountId: string;
   databaseId: string;
   apiToken: string;
 } {
+  const { CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_DATABASE_ID, CLOUDFLARE_API_TOKEN } = process.env;
   if (
     !CLOUDFLARE_ACCOUNT_ID ||
     !CLOUDFLARE_DATABASE_ID ||
@@ -31,5 +42,3 @@ export function getCloudflareEnv(): {
     apiToken: CLOUDFLARE_API_TOKEN,
   };
 }
-
-export { CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_DATABASE_ID, CLOUDFLARE_API_TOKEN };
