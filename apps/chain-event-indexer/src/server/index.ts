@@ -13,7 +13,7 @@ const { accountId, databaseId, apiToken } = getCloudflareEnv();
 
 const publicClient = createClient(RPC_URLS[0]);
 
-const LOOKBACK = 1800n * 24n;
+const LOOKBACK = 1800n * 24n * 1n;
 const CATCHUP_THRESHOLD = 100n;
 
 async function main() {
