@@ -17,7 +17,7 @@ const { accountId, databaseId, apiToken } = getCloudflareEnv();
 
 const publicClient = createClient(RPC_URLS[0]);
 
-const LOOKBACK = 1800n * 24n * 1n;
+const LOOKBACK = 1000n; //1800n * 24n * 1n;
 const CATCHUP_THRESHOLD = 100n;
 
 async function main() {
@@ -79,7 +79,13 @@ async function main() {
         );
 
         // Evaluar arbitraje en tiempo real reutilizando los precios en memoria (0 RPCs extra) y guardar oportunidad en D1
-        checkArbitrageForBlock(blockNumber, prices[0].buyPrice, prices[0].sellPrice, db, blockTimestampIso).catch(console.error);
+        checkArbitrageForBlock(
+          blockNumber,
+          prices[0].buyPrice,
+          prices[0].sellPrice,
+          db,
+          blockTimestampIso,
+        ).catch(console.error);
       }
     } catch (err) {
       console.error(
