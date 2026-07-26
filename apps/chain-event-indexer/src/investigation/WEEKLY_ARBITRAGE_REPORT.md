@@ -80,36 +80,27 @@ A continuación se detalla el comportamiento de las principales billeteras opera
 [ PagoMovil Fiat VES ]
 ```
 
-### Diagrama del Flujo Lado 2 (Inyección):
-```text
-[ PagoMovil Fiat VES ]
-       │  (Compra USDT/USDC barato en Binance P2P)
-       ▼
-[ BINANCE HOT WALLET 2 ]  (0xEe7aE85f2Fe2239E27D9c1E23fFFe168D63b4055)
-       │  (Retiro a red Base Mainnet)
-       ▼
-[ Billetera del Vendedor ]  (Ej: 0x0674... / 0x618a...)
-       │  (Venta USDC a tasa alta en Contrato)
-       ▼
-[ Contrato Diamond P2P ]
-```
+---
+
+## 💰 4. Análisis de Saldos en Vivo y Estrategia Just-In-Time
+
+* **Saldos Retenidos On-Chain:** Se identificaron billeteras como `0x54fe...0522` reteniendo **$5,250.00 USDC** y `0xfe4e...b774` con **$1,008.98 USDC** listos para operar.
+* **Patrón Just-in-Time:** La mayoría de los operadores mantienen saldos residuales ($30-$50 USDC) y transfieren USDC desde Binance justo en el segundo en que se detecta la apertura de la oportunidad.
+* **Monitoreo en Telegram:** El comando `/saldos` consulta en vivo los saldos USDC/ETH del Top 5 Billeteras + Intermedias CEX.
 
 ---
 
-## 🤖 4. Red de Bots Exploradores (Sondeo de Latencia)
+## 🤖 5. Red de Bots Exploradores (Sondeo de Latencia)
 
 Se identificaron **28 billeteras automáticas** diseñadas para detectar el desfase de tasa entre Binance P2P y el contrato Diamond:
 
 * **Bot Principal (`0x0776852ef593cabd26ae43765f22179e89c41178`):**
   * **297 cancelaciones de 299 órdenes** (99.3% de tasa de cancelación).
   * Envía órdenes simbólicas de **$0.50 USDC**. Si la tasa es favorable y el contrato responde rápido, cancela e informa a la cuenta Whale principal para ejecutar ráfagas de $250 USDC.
-* **Otros Bots Activos:**
-  * `0x0aa9656dffdc83dde40ee4f60d5e811fa0c0ad68` (121 de 121 canceladas - 100%).
-  * `0xc6b0f7e54e06226cc3a335b1a058d66960f0b8a4` (20 de 20 canceladas - 100%).
 
 ---
 
-## 🕒 5. Distribución de Horarios de Mayor Actividad (UTC vs Venezuela)
+## 🕒 6. Distribución de Horarios de Mayor Actividad (UTC vs Venezuela)
 
 | Franja Horaria (UTC) | Hora Venezuela (VET) | Nivel de Actividad | Descripción |
 |----------------------|----------------------|-------------------|-------------|
@@ -120,22 +111,22 @@ Se identificaron **28 billeteras automáticas** diseñadas para detectar el desf
 
 ---
 
-## 💡 6. Conclusiones y Diagnóstico Técnico
-
-1. **Latencia del Oráculo del Contrato:** La ventana de arbitraje se produce porque las transacciones de actualización de precio (`setPriceConfig`) tienen una latencia de 2 a 6 minutos respecto a Binance P2P.
-2. **Operación Profesional:** Las Top 10 billeteras mueven entre **$5,000 y $12,000 USDC semanales cada una**, utilizando bots exploradores para no arriesgar capital hasta confirmar la oportunidad.
-3. **Flujo Cerrado Binance:** El 100% de la liquidez rastreada termina o proviene de la **Hot Wallet 2 de Binance (`0xEe7a...055`)**.
-
----
-
 ## ⏱️ 7. Medición Empírica de la Duración de las Brechas
-
-A través del análisis de más de 60 actualizaciones de tasa (`setPriceConfig`) indexadas en la base de datos D1:
 
 * ⏱️ **Tiempo Promedio de Duración de Tasa:** **335.0 segundos (~5.58 minutos)**.
 * 📦 **Bloques Promedio entre Ajustes:** **168 bloques** en Base Mainnet.
 * ⚡ **Frecuencia en Alta Volatilidad:** **Cada 120 segundos (~2.0 minutos / 60 bloques)**.
 
 ### Implicación Estratégica:
-La ventana de oportunidad para ejecutar una orden permanece abierta durante **60 a 150 bloques (2 a 5 minutos)**. Este margen de tiempo es lo que permite a las cuentas Whale ejecutar ráfagas de 3 a 5 órdenes consecutivas de **$250 USDC** antes de que el contrato actualice su tasa on-chain.
+La ventana de oportunidad para ejecutar una orden permanece abierta durante **60 a 150 bloques (2 a 5 minutos)**. Este margen de tiempo permite a las cuentas Whale ejecutar ráfagas de 3 a 5 órdenes consecutivas de **$250 USDC**.
 
+---
+
+## 🛠️ 8. Arquitectura del Bot de Arbitraje Integrado y Módulo Ejecutor
+
+* **Módulo Ejecutor Dedicado:** `src/arbitrage-bot/executor/trade-executor.ts`
+* **Botón Interactivo Inline:** Las alertas incluyen el botón `[ ⚡ EJECUTAR COMPRA ($250 USDC) ]`.
+* **Notificaciones Telegram:**
+  1. 🟢 `Oportunidad Abierta` (Margen $\ge 1.0\%$)
+  2. 📈 `Expansión de Margen` (Re-alerta al subir $+0.5\%$ adicional)
+  3. 🛑 `Cierre de Oportunidad` (Informando bloques y tiempo de apertura)
