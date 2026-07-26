@@ -25,12 +25,16 @@ type ActiveOpportunityState = {
 let activeOppLado1: ActiveOpportunityState | null = null;
 let activeOppLado2: ActiveOpportunityState | null = null;
 
+// Control de fallos de la API de Binance P2P
+let binanceConsecutiveFailures = 0;
+let isBinanceDownAlertSent = false;
+
 // Incremento mínimo de margen (%) para enviar una actualización de expansión de ganancia
 const MARGIN_EXPANSION_THRESHOLD_PCT = 0.5;
 
 /**
  * Evalúa oportunidades de arbitraje en tiempo real.
- * Avisa cuando una oportunidad se ABRE, cuando el MARGEN AUMENTA y cuando se CIERRA.
+ * Avisa si la API de Binance falla, cuando una oportunidad se ABRE, cuando el MARGEN AUMENTA y cuando se CIERRA.
  */
 export async function checkArbitrageForBlock(
   blockNumber: bigint | number,
@@ -45,7 +49,41 @@ export async function checkArbitrageForBlock(
       fetchBinanceP2PPrice("BUY"),
     ]);
 
-    if (!binanceSellPrice || !binanceBuyPrice) return;
+    // MANEJO DE FALLO DE API BINANCE P2P
+    if (!binanceSellPrice || !binanceBuyPrice) {
+      binanceConsecutiveFailures++;
+      console.warn(
+        `⚠️ Advertencia: Fallo consultando Binance P2P API (${binanceConsecutiveFailures} fallos consecutivos).`,
+      );
+
+      if (binanceConsecutiveFailures >= 3 && !isBinanceDownAlertSent) {
+        isBinanceDownAlertSent = true;
+        const alertHtml =
+          `⚠️ <b>¡ALERTA: LA API DE BINANCE P2P NO ESTÁ RESPONDIENDO!</b> ⚠️\n\n` +
+          `❌ <b>Fallo:</b> Imposible consultar la API de Binance P2P (${binanceConsecutiveFailures} fallos consecutivos).\n` +
+          `📌 <i>El monitoreo continuará intentando automáticamente hasta que la API de Binance P2P se restablezca.</i>`;
+
+        console.error(
+          `❌ Enviando alerta a Telegram: Binance P2P API caída o bloqueada.`,
+        );
+        await sendTelegramAlert(alertHtml);
+      }
+      return;
+    }
+
+    // SI BINANCE P2P SE RESTABLECE TRAS UNA CAÍDA
+    if (isBinanceDownAlertSent) {
+      isBinanceDownAlertSent = false;
+      const recoveryHtml =
+        `✅ <b>LA API DE BINANCE P2P SE HA RESTABLECIDO</b> ✅\n\n` +
+        `🟢 <b>Estado:</b> La API de Binance P2P responde correctamente. Monitoreo de arbitraje reanudado de forma normal.`;
+
+      console.log(
+        `✅ Enviando aviso a Telegram: Binance P2P API restablecida.`,
+      );
+      await sendTelegramAlert(recoveryHtml);
+    }
+    binanceConsecutiveFailures = 0;
 
     const now = Date.now();
     const bn = Number(blockNumber);
@@ -278,7 +316,7 @@ export async function startArbitrageMonitor() {
     "=================================================================",
   );
   console.log(
-    "🚀 BOT DE ARBITRAJE P2P — MONITOREO CON EXPANSIÓN DE MARGEN Y TELEGRAM",
+    "🚀 BOT DE ARBITRAJE P2P — MONITOREO CON CONTROL DE FALLOS Y TELEGRAM",
   );
   console.log("   - Red Blockchain: Base Mainnet");
   console.log("   - Par de Comercio: VES / USDC");
@@ -293,7 +331,7 @@ export async function startArbitrageMonitor() {
       "% de ganancia neta",
   );
   console.log(
-    "   - Umbral de Re-Alerta por Expansión: +0.5% incremento adicional",
+    "   - Control de Fallos Binance API: ACTIVADO ⚠️ (Alerta a Telegram al fallar y al restablecer)",
   );
   console.log(
     "   - Notificación Telegram: ACTIVADA 📲 (Apertura, Expansión, Cierre y Botones)",
