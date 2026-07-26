@@ -4,9 +4,8 @@ import { v4 as uuidv4 } from "uuid";
 import type { BlockPriceResult } from "../price";
 
 /**
- * Persiste un precio de bloque en D1.
- * Usa ON CONFLICT DO NOTHING para ser idempotente — si el bloque+currency
- * ya existe, no hace nada.
+ * Persiste un precio de bloque en D1 incluyendo tasas de Contrato y tasas de Binance P2P.
+ * Usa ON CONFLICT DO NOTHING para ser idempotente.
  */
 export async function persistBlockPrice(
   db: DrizzleD1Database<typeof schema>,
@@ -14,6 +13,8 @@ export async function persistBlockPrice(
   price: BlockPriceResult,
   blockTimestamp: string,
   blockTimestampUnix: number,
+  binanceBuyPrice: number = 0,
+  binanceSellPrice: number = 0,
 ): Promise<void> {
   await db
     .insert(schema.blockPrices)
@@ -24,6 +25,8 @@ export async function persistBlockPrice(
       currencyHex: price.currencyHex,
       buyPrice: price.buyPrice,
       sellPrice: price.sellPrice,
+      binanceBuyPrice,
+      binanceSellPrice,
       buyPriceOffset: price.buyPriceOffset,
       baseSpread: price.baseSpread,
       blockTimestamp,
@@ -41,8 +44,18 @@ export async function persistBlockPrices(
   prices: BlockPriceResult[],
   blockTimestamp: string,
   blockTimestampUnix: number,
+  binanceBuyPrice: number = 0,
+  binanceSellPrice: number = 0,
 ): Promise<void> {
   for (const price of prices) {
-    await persistBlockPrice(db, blockNumber, price, blockTimestamp, blockTimestampUnix);
+    await persistBlockPrice(
+      db,
+      blockNumber,
+      price,
+      blockTimestamp,
+      blockTimestampUnix,
+      binanceBuyPrice,
+      binanceSellPrice
+    );
   }
 }

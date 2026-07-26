@@ -78,6 +78,8 @@ export const blockPrices = sqliteTable("block_prices", {
   currencyHex: text("currency_hex").notNull(),
   buyPrice: real("buy_price").notNull(),
   sellPrice: real("sell_price").notNull(),
+  binanceBuyPrice: real("binance_buy_price").notNull().default(0),
+  binanceSellPrice: real("binance_sell_price").notNull().default(0),
   buyPriceOffset: real("buy_price_offset").notNull(),
   baseSpread: real("base_spread").notNull(),
   blockTimestamp: text("block_timestamp").notNull().default(""),

@@ -1,7 +1,8 @@
 /**
  * Módulo de consulta de precios en vivo a Binance P2P API.
- * Aplica los filtros exactos de método de pago (PagoMovil)
- * e incluye caché de 8 segundos para evitar rate-limiting de Binance.
+ * Aplica los filtros exactos de método de pago (PagoMovil),
+ * filtrado por ventana de pago rápida (15 minutos para venta)
+ * y filtrado dinámico por monto en FIAT (transAmount).
  */
 
 let cachedBuyPrice: number | null = null;
@@ -12,7 +13,10 @@ let lastSellFetchTime = 0;
 
 const CACHE_TTL_MS = 8000; // 8 segundos de caché
 
-export async function fetchBinanceP2PPrice(tradeType: "BUY" | "SELL" = "SELL"): Promise<number | null> {
+export async function fetchBinanceP2PPrice(
+  tradeType: "BUY" | "SELL" = "SELL",
+  transAmountFiat?: number
+): Promise<number | null> {
   const now = Date.now();
 
   if (tradeType === "BUY" && cachedBuyPrice && now - lastBuyFetchTime < CACHE_TTL_MS) {
@@ -23,7 +27,10 @@ export async function fetchBinanceP2PPrice(tradeType: "BUY" | "SELL" = "SELL"): 
   }
 
   try {
-    const payload = {
+    // Para venta en Binance P2P, exigimos estrictamente la ventana de pago de 15 minutos (periods: [15])
+    const periods = tradeType === "SELL" ? [15] : [];
+
+    const payload: any = {
       fiat: "VES",
       page: 1,
       rows: 10,
@@ -33,7 +40,7 @@ export async function fetchBinanceP2PPrice(tradeType: "BUY" | "SELL" = "SELL"): 
       proMerchantAds: false,
       shieldMerchantAds: false,
       filterType: "all",
-      periods: [],
+      periods,
       additionalKycVerifyFilter: 0,
       publisherType: null,
       payTypes: ["PagoMovil"],
@@ -41,6 +48,10 @@ export async function fetchBinanceP2PPrice(tradeType: "BUY" | "SELL" = "SELL"): 
       tradedWith: false,
       followed: false,
     };
+
+    if (transAmountFiat && transAmountFiat > 0) {
+      payload.transAmount = Math.round(transAmountFiat);
+    }
 
     const res = await fetch("https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search", {
       method: "POST",

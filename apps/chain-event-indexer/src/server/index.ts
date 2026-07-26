@@ -70,22 +70,25 @@ async function main() {
 
       const prices = await fetchAllPricesAtBlock(blockNumber);
       if (prices.length > 0) {
+        // Evaluar arbitraje en tiempo real y obtener tasas de Binance P2P filtradas por monto
+        const { binanceBuyPrice, binanceSellPrice } = await checkArbitrageForBlock(
+          blockNumber,
+          prices[0].buyPrice,
+          prices[0].sellPrice,
+          db,
+          blockTimestampIso
+        ).catch(() => ({ binanceBuyPrice: 0, binanceSellPrice: 0 }));
+
+        // Persistir en D1 las tasas del contrato + las tasas de Binance P2P por bloque
         await persistBlockPrices(
           db,
           Number(blockNumber),
           prices,
           blockTimestampIso,
           blockTimestampUnix,
+          binanceBuyPrice,
+          binanceSellPrice
         );
-
-        // Evaluar arbitraje en tiempo real reutilizando los precios en memoria (0 RPCs extra) y guardar oportunidad en D1
-        checkArbitrageForBlock(
-          blockNumber,
-          prices[0].buyPrice,
-          prices[0].sellPrice,
-          db,
-          blockTimestampIso,
-        ).catch(console.error);
       }
     } catch (err) {
       console.error(

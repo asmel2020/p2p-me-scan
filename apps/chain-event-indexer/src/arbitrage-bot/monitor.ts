@@ -41,20 +41,20 @@ export async function checkArbitrageForBlock(
   contractBuyPrice: number,
   contractSellPrice: number,
   db: DB = defaultDb,
-  blockTimestampIso?: string,
-) {
+  blockTimestampIso?: string
+): Promise<{ binanceBuyPrice: number; binanceSellPrice: number }> {
   try {
+    const estimatedFiatAmount = Math.round(BOT_CONFIG.simulatedTradeUsdc * contractBuyPrice);
+
     const [binanceSellPrice, binanceBuyPrice] = await Promise.all([
-      fetchBinanceP2PPrice("SELL"),
-      fetchBinanceP2PPrice("BUY"),
+      fetchBinanceP2PPrice("SELL", estimatedFiatAmount),
+      fetchBinanceP2PPrice("BUY", estimatedFiatAmount),
     ]);
 
     // MANEJO DE FALLO DE API BINANCE P2P
     if (!binanceSellPrice || !binanceBuyPrice) {
       binanceConsecutiveFailures++;
-      console.warn(
-        `⚠️ Advertencia: Fallo consultando Binance P2P API (${binanceConsecutiveFailures} fallos consecutivos).`,
-      );
+      console.warn(`⚠️ Advertencia: Fallo consultando Binance P2P API (${binanceConsecutiveFailures} fallos consecutivos).`);
 
       if (binanceConsecutiveFailures >= 3 && !isBinanceDownAlertSent) {
         isBinanceDownAlertSent = true;
@@ -63,12 +63,10 @@ export async function checkArbitrageForBlock(
           `❌ <b>Fallo:</b> Imposible consultar la API de Binance P2P (${binanceConsecutiveFailures} fallos consecutivos).\n` +
           `📌 <i>El monitoreo continuará intentando automáticamente hasta que la API se restablezca.</i>`;
 
-        console.error(
-          `❌ Enviando alerta a Telegram: Binance P2P API caída o bloqueada.`,
-        );
+        console.error(`❌ Enviando alerta a Telegram: Binance P2P API caída o bloqueada.`);
         await sendTelegramAlert(alertHtml);
       }
-      return;
+      return { binanceBuyPrice: 0, binanceSellPrice: 0 };
     }
 
     // SI BINANCE P2P SE RESTABLECE TRAS UNA CAÍDA
@@ -288,11 +286,14 @@ export async function checkArbitrageForBlock(
     if (!BOT_CONFIG.silentConsoleLogs) {
       const timestamp = new Date().toLocaleTimeString();
       console.log(
-        `[${timestamp}] Bloque ${bn} | Contrato [Compra: ${contractBuyPrice.toFixed(2)} | Venta: ${contractSellPrice.toFixed(2)}] | Binance [Compra: ${binanceBuyPrice.toFixed(2)} | Venta: ${binanceSellPrice.toFixed(2)}] | Margen L1: ${marginLado1Pct.toFixed(2)}% | Margen L2: ${marginLado2Pct.toFixed(2)}%`,
+        `[${timestamp}] Bloque ${bn} | Contrato [Compra: ${contractBuyPrice.toFixed(2)} | Venta: ${contractSellPrice.toFixed(2)}] | Binance [Compra: ${binanceBuyPrice.toFixed(2)} | Venta: ${binanceSellPrice.toFixed(2)}] | Margen L1: ${marginLado1Pct.toFixed(2)}% | Margen L2: ${marginLado2Pct.toFixed(2)}%`
       );
     }
+
+    return { binanceBuyPrice, binanceSellPrice };
   } catch (err: any) {
     console.error("Error en evaluación de arbitraje:", err?.message ?? err);
+    return { binanceBuyPrice: 0, binanceSellPrice: 0 };
   }
 }
 
