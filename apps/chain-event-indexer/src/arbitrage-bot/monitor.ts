@@ -34,7 +34,7 @@ const MARGIN_EXPANSION_THRESHOLD_PCT = 0.5;
 
 /**
  * Evalúa oportunidades de arbitraje en tiempo real.
- * Avisa si la API de Binance falla, cuando una oportunidad se ABRE, cuando el MARGEN AUMENTA y cuando se CIERRA.
+ * Muestra las acciones y tasas en estricto orden cronológico (Paso 1 -> Paso 2).
  */
 export async function checkArbitrageForBlock(
   blockNumber: bigint | number,
@@ -61,7 +61,7 @@ export async function checkArbitrageForBlock(
         const alertHtml =
           `⚠️ <b>¡ALERTA: LA API DE BINANCE P2P NO ESTÁ RESPONDIENDO!</b> ⚠️\n\n` +
           `❌ <b>Fallo:</b> Imposible consultar la API de Binance P2P (${binanceConsecutiveFailures} fallos consecutivos).\n` +
-          `📌 <i>El monitoreo continuará intentando automáticamente hasta que la API de Binance P2P se restablezca.</i>`;
+          `📌 <i>El monitoreo continuará intentando automáticamente hasta que la API se restablezca.</i>`;
 
         console.error(
           `❌ Enviando alerta a Telegram: Binance P2P API caída o bloqueada.`,
@@ -76,7 +76,7 @@ export async function checkArbitrageForBlock(
       isBinanceDownAlertSent = false;
       const recoveryHtml =
         `✅ <b>LA API DE BINANCE P2P SE HA RESTABLECIDO</b> ✅\n\n` +
-        `🟢 <b>Estado:</b> La API de Binance P2P responde correctamente. Monitoreo de arbitraje reanudado de forma normal.`;
+        `🟢 <b>Estado:</b> La API de Binance P2P responde correctamente. Monitoreo reanudado.`;
 
       console.log(
         `✅ Enviando aviso a Telegram: Binance P2P API restablecida.`,
@@ -90,7 +90,7 @@ export async function checkArbitrageForBlock(
     const tsIso = blockTimestampIso || new Date(now).toISOString();
 
     // ----------------------------------------------------------------------
-    // LADO 1: Comprar en Contrato -> Vender en Binance P2P
+    // LADO 1: 1. Comprar en Contrato -> 2. Vender en Binance P2P
     // ----------------------------------------------------------------------
     const spreadLado1 = binanceSellPrice - contractBuyPrice;
     const marginLado1Pct = (spreadLado1 / contractBuyPrice) * 100;
@@ -98,7 +98,6 @@ export async function checkArbitrageForBlock(
       BOT_CONFIG.simulatedTradeUsdc * (marginLado1Pct / 100);
 
     if (marginLado1Pct >= BOT_CONFIG.minProfitMarginPct) {
-      // Guardar registro de la oportunidad en D1
       await persistArbitrageOpportunity(db, {
         blockNumber: bn,
         route: "LADO_1",
@@ -113,7 +112,6 @@ export async function checkArbitrageForBlock(
         blockTimestampIso: tsIso,
       }).catch(console.error);
 
-      // CASO 1A: Oportunidad recién ABIERTA
       if (!activeOppLado1) {
         activeOppLado1 = {
           startBlock: bn,
@@ -126,9 +124,9 @@ export async function checkArbitrageForBlock(
         const msgHtml =
           `🟢 <b>¡OPORTUNIDAD ABIERTA (LADO 1)!</b> 🟢\n\n` +
           `📦 <b>Bloque de Inicio:</b> ${bn}\n` +
-          `🎯 <b>Acción:</b> Comprar en Contrato ➡️ Vender en Binance P2P\n\n` +
-          `🔹 <b>Tasa Compra Contrato:</b> ${contractBuyPrice.toFixed(2)} VES/USDC\n` +
-          `🔹 <b>Tasa Venta Binance P2P:</b> ${binanceSellPrice.toFixed(2)} VES/USDC\n` +
+          `🎯 <b>Ruta de Operación:</b>\n` +
+          ` 1️⃣ <b>Compras USDC en Contrato:</b> ${contractBuyPrice.toFixed(2)} VES/USDC\n` +
+          ` 2️⃣ <b>Vendes USDC en Binance P2P:</b> ${binanceSellPrice.toFixed(2)} VES/USDC\n\n` +
           `📈 <b>Spread Bruto:</b> +${spreadLado1.toFixed(2)} VES/USDC\n` +
           `⚡ <b>Margen Neto Inicial:</b> +${marginLado1Pct.toFixed(2)}%\n\n` +
           `💵 <b>Ganancia Proyectada ($${BOT_CONFIG.simulatedTradeUsdc} USDC):</b> +$${profitLado1Usdc.toFixed(2)} USDC`;
@@ -138,12 +136,10 @@ export async function checkArbitrageForBlock(
         );
         await sendTelegramAlertWithButton(
           msgHtml,
-          `⚡ EJECUTAR COMPRA (+${marginLado1Pct.toFixed(1)}%)`,
+          `⚡ EJECUTAR LADO 1 (+${marginLado1Pct.toFixed(1)}%)`,
           `exec_trade_LADO1_${bn}`,
         );
-      }
-      // CASO 1B: Oportunidad ya abierta, pero EL MARGEN AUMENTÓ de forma significativa (+0.5% o más)
-      else if (
+      } else if (
         marginLado1Pct >=
         activeOppLado1.lastNotifiedMarginPct + MARGIN_EXPANSION_THRESHOLD_PCT
       ) {
@@ -154,9 +150,9 @@ export async function checkArbitrageForBlock(
           `📈 <b>¡EL MARGEN AUMENTÓ EN LADO 1!</b> 📈\n\n` +
           `📦 <b>Bloque:</b> ${bn}\n` +
           `🔥 <b>Expansión de Margen:</b> +${prevMargin.toFixed(2)}% ➔ <b>+${marginLado1Pct.toFixed(2)}%</b>\n\n` +
-          `🔹 <b>Tasa Compra Contrato:</b> ${contractBuyPrice.toFixed(2)} VES/USDC\n` +
-          `🔹 <b>Tasa Venta Binance P2P:</b> ${binanceSellPrice.toFixed(2)} VES/USDC\n` +
-          `📈 <b>Nuevo Spread:</b> +${spreadLado1.toFixed(2)} VES/USDC\n\n` +
+          ` 1️⃣ <b>Compras USDC en Contrato:</b> ${contractBuyPrice.toFixed(2)} VES/USDC\n` +
+          ` 2️⃣ <b>Vendes USDC en Binance P2P:</b> ${binanceSellPrice.toFixed(2)} VES/USDC\n\n` +
+          `📈 <b>Nuevo Spread:</b> +${spreadLado1.toFixed(2)} VES/USDC\n` +
           `💵 <b>NUEVA Ganancia ($${BOT_CONFIG.simulatedTradeUsdc} USDC):</b> +$${profitLado1Usdc.toFixed(2)} USDC`;
 
         console.log(
@@ -169,7 +165,6 @@ export async function checkArbitrageForBlock(
         );
       }
     } else {
-      // CASO 1C: Oportunidad CERRADA (Margen cayó por debajo del umbral)
       if (activeOppLado1) {
         const durationSec = Math.round((now - activeOppLado1.startTime) / 1000);
         const durationMin = (durationSec / 60).toFixed(1);
@@ -179,7 +174,7 @@ export async function checkArbitrageForBlock(
           `🛑 <b>¡OPORTUNIDAD CERRADA (LADO 1)!</b> 🛑\n\n` +
           `📦 <b>Bloque de Cierre:</b> ${bn} (Duración: ${blocksCount} bloques)\n` +
           `⏱️ <b>Tiempo Total Abierta:</b> ${durationSec} seg (~${durationMin} min)\n\n` +
-          `📉 <b>Tasa Contrato Actual:</b> ${contractBuyPrice.toFixed(2)} VES/USDC\n` +
+          `📉 <b>Tasa Contrato Compra Actual:</b> ${contractBuyPrice.toFixed(2)} VES/USDC\n` +
           `📉 <b>Tasa Binance Venta Actual:</b> ${binanceSellPrice.toFixed(2)} VES/USDC\n` +
           `📊 <b>Margen Actual:</b> ${marginLado1Pct.toFixed(2)}% (La brecha se ha cerrado)`;
 
@@ -193,7 +188,7 @@ export async function checkArbitrageForBlock(
     }
 
     // ----------------------------------------------------------------------
-    // LADO 2: Comprar en Binance P2P -> Vender en Contrato
+    // LADO 2: 1. Vender en Contrato -> 2. Recomprar en Binance P2P
     // ----------------------------------------------------------------------
     const spreadLado2 = contractSellPrice - binanceBuyPrice;
     const marginLado2Pct = (spreadLado2 / binanceBuyPrice) * 100;
@@ -201,7 +196,6 @@ export async function checkArbitrageForBlock(
       BOT_CONFIG.simulatedTradeUsdc * (marginLado2Pct / 100);
 
     if (marginLado2Pct >= BOT_CONFIG.minProfitMarginPct) {
-      // Guardar registro de la oportunidad en D1
       await persistArbitrageOpportunity(db, {
         blockNumber: bn,
         route: "LADO_2",
@@ -216,7 +210,6 @@ export async function checkArbitrageForBlock(
         blockTimestampIso: tsIso,
       }).catch(console.error);
 
-      // CASO 2A: Oportunidad recién ABIERTA
       if (!activeOppLado2) {
         activeOppLado2 = {
           startBlock: bn,
@@ -229,9 +222,9 @@ export async function checkArbitrageForBlock(
         const msgHtml =
           `🔴 <b>¡OPORTUNIDAD ABIERTA (LADO 2)!</b> 🔴\n\n` +
           `📦 <b>Bloque de Inicio:</b> ${bn}\n` +
-          `🎯 <b>Acción:</b> Comprar en Binance P2P ➡️ Vender en Contrato\n\n` +
-          `🔹 <b>Tasa Compra Binance P2P:</b> ${binanceBuyPrice.toFixed(2)} VES/USDC\n` +
-          `🔹 <b>Tasa Venta Contrato:</b> ${contractSellPrice.toFixed(2)} VES/USDC\n` +
+          `🎯 <b>Ruta de Operación:</b>\n` +
+          ` 1️⃣ <b>Vendes USDC en Contrato:</b> ${contractSellPrice.toFixed(2)} VES/USDC\n` +
+          ` 2️⃣ <b>Recompras USDC en Binance P2P:</b> ${binanceBuyPrice.toFixed(2)} VES/USDC\n\n` +
           `📈 <b>Spread Bruto:</b> +${spreadLado2.toFixed(2)} VES/USDC\n` +
           `⚡ <b>Margen Neto Inicial:</b> +${marginLado2Pct.toFixed(2)}%\n\n` +
           `💵 <b>Ganancia Proyectada ($${BOT_CONFIG.simulatedTradeUsdc} USDC):</b> +$${profitLado2Usdc.toFixed(2)} USDC`;
@@ -241,12 +234,10 @@ export async function checkArbitrageForBlock(
         );
         await sendTelegramAlertWithButton(
           msgHtml,
-          `⚡ EJECUTAR COMPRA (+${marginLado2Pct.toFixed(1)}%)`,
+          `⚡ EJECUTAR LADO 2 (+${marginLado2Pct.toFixed(1)}%)`,
           `exec_trade_LADO2_${bn}`,
         );
-      }
-      // CASO 2B: Oportunidad ya abierta, pero EL MARGEN AUMENTÓ de forma significativa (+0.5% o más)
-      else if (
+      } else if (
         marginLado2Pct >=
         activeOppLado2.lastNotifiedMarginPct + MARGIN_EXPANSION_THRESHOLD_PCT
       ) {
@@ -257,9 +248,9 @@ export async function checkArbitrageForBlock(
           `📈 <b>¡EL MARGEN AUMENTÓ EN LADO 2!</b> 📈\n\n` +
           `📦 <b>Bloque:</b> ${bn}\n` +
           `🔥 <b>Expansión de Margen:</b> +${prevMargin.toFixed(2)}% ➔ <b>+${marginLado2Pct.toFixed(2)}%</b>\n\n` +
-          `🔹 <b>Tasa Compra Binance P2P:</b> ${binanceBuyPrice.toFixed(2)} VES/USDC\n` +
-          `🔹 <b>Tasa Venta Contrato:</b> ${contractSellPrice.toFixed(2)} VES/USDC\n` +
-          `📈 <b>Nuevo Spread:</b> +${spreadLado2.toFixed(2)} VES/USDC\n\n` +
+          ` 1️⃣ <b>Vendes USDC en Contrato:</b> ${contractSellPrice.toFixed(2)} VES/USDC\n` +
+          ` 2️⃣ <b>Recompras USDC en Binance P2P:</b> ${binanceBuyPrice.toFixed(2)} VES/USDC\n\n` +
+          `📈 <b>Nuevo Spread:</b> +${spreadLado2.toFixed(2)} VES/USDC\n` +
           `💵 <b>NUEVA Ganancia ($${BOT_CONFIG.simulatedTradeUsdc} USDC):</b> +$${profitLado2Usdc.toFixed(2)} USDC`;
 
         console.log(
@@ -272,7 +263,6 @@ export async function checkArbitrageForBlock(
         );
       }
     } else {
-      // CASO 2C: Oportunidad CERRADA (Margen cayó por debajo del umbral)
       if (activeOppLado2) {
         const durationSec = Math.round((now - activeOppLado2.startTime) / 1000);
         const durationMin = (durationSec / 60).toFixed(1);
@@ -282,8 +272,8 @@ export async function checkArbitrageForBlock(
           `🛑 <b>¡OPORTUNIDAD CERRADA (LADO 2)!</b> 🛑\n\n` +
           `📦 <b>Bloque de Cierre:</b> ${bn} (Duración: ${blocksCount} bloques)\n` +
           `⏱️ <b>Tiempo Total Abierta:</b> ${durationSec} seg (~${durationMin} min)\n\n` +
-          `📉 <b>Tasa Binance Compra Actual:</b> ${binanceBuyPrice.toFixed(2)} VES/USDC\n` +
           `📉 <b>Tasa Contrato Venta Actual:</b> ${contractSellPrice.toFixed(2)} VES/USDC\n` +
+          `📉 <b>Tasa Binance Compra Actual:</b> ${binanceBuyPrice.toFixed(2)} VES/USDC\n` +
           `📊 <b>Margen Actual:</b> ${marginLado2Pct.toFixed(2)}% (La brecha se ha cerrado)`;
 
         console.log(
@@ -316,7 +306,7 @@ export async function startArbitrageMonitor() {
     "=================================================================",
   );
   console.log(
-    "🚀 BOT DE ARBITRAJE P2P — MONITOREO CON CONTROL DE FALLOS Y TELEGRAM",
+    "🚀 BOT DE ARBITRAJE P2P — MONITOREO CON ORDEN CRONOLÓGICO DE PASOS",
   );
   console.log("   - Red Blockchain: Base Mainnet");
   console.log("   - Par de Comercio: VES / USDC");
@@ -330,20 +320,12 @@ export async function startArbitrageMonitor() {
       BOT_CONFIG.minProfitMarginPct +
       "% de ganancia neta",
   );
-  console.log(
-    "   - Control de Fallos Binance API: ACTIVADO ⚠️ (Alerta a Telegram al fallar y al restablecer)",
-  );
+  console.log("   - Orden Cronológico de Pasos: 1️⃣ Paso 1 ➡️ 2️⃣ Paso 2");
   console.log(
     "   - Notificación Telegram: ACTIVADA 📲 (Apertura, Expansión, Cierre y Botones)",
   );
   console.log(
     "   - Persistencia D1: TABLA `arbitrage_opportunities` ACTIVADA 💾",
-  );
-  console.log(
-    "   - Logs Continuos de Consola: " +
-      (BOT_CONFIG.silentConsoleLogs
-        ? "SILENCIADOS 🔇 (Solo alertas)"
-        : "ACTIVADOS 🔊"),
   );
   console.log(
     "=================================================================\n",
