@@ -101,11 +101,13 @@ class D1RemoteStatement {
   }
 }
 
+export type DB = DrizzleD1Database<typeof schema>;
+
 export function initRemoteDB(
   accountId: string,
   databaseId: string,
   apiToken: string,
-): DrizzleD1Database<typeof schema> {
+): DB {
   const client = new D1RemoteClient(accountId, databaseId, apiToken);
   return drizzle(client as unknown as import("@cloudflare/workers-types").D1Database, { schema }) as unknown as DrizzleD1Database<typeof schema>;
 }

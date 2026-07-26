@@ -1,8 +1,13 @@
 import { fetchBinanceP2PPrice } from "./binance";
 import { BOT_CONFIG, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID } from "./config";
-import { sendTelegramAlert } from "./telegram";
+import { sendTelegramAlert, startTelegramCommandListener } from "./telegram";
 import { createClient, RPC_URLS, fetchContractPriceAtBlock } from "./contract";
+import { initRemoteDB, type DB } from "@p2p-me/db/client";
+import { getCloudflareEnv } from "../shared/env";
+import { persistArbitrageOpportunity } from "../shared/db/opportunity-store";
 
+const { accountId, databaseId, apiToken } = getCloudflareEnv();
+const defaultDb = initRemoteDB(accountId, databaseId, apiToken);
 const publicClient = createClient(RPC_URLS[0]);
 
 let lastAlertTimeLado1 = 0;
@@ -10,12 +15,15 @@ let lastAlertTimeLado2 = 0;
 
 /**
  * Evalúa oportunidades de arbitraje reutilizando los precios del contrato
- * que el indexer ya consultó en memoria (0 llamadas RPC extra).
+ * que el indexer ya consultó en memoria (0 llamadas RPC extra)
+ * y persiste las oportunidades detectadas en la tabla `arbitrage_opportunities` de D1.
  */
 export async function checkArbitrageForBlock(
   blockNumber: bigint | number,
   contractBuyPrice: number,
-  contractSellPrice: number
+  contractSellPrice: number,
+  db: DB = defaultDb,
+  blockTimestampIso?: string
 ) {
   try {
     // Consultar Binance P2P (Sell y Buy) en paralelo
@@ -28,6 +36,7 @@ export async function checkArbitrageForBlock(
 
     const now = Date.now();
     const bn = Number(blockNumber);
+    const tsIso = blockTimestampIso || new Date(now).toISOString();
 
     // ----------------------------------------------------------------------
     // LADO 1: Comprar en Contrato -> Vender en Binance P2P
@@ -37,6 +46,21 @@ export async function checkArbitrageForBlock(
     const profitLado1Usdc = BOT_CONFIG.simulatedTradeUsdc * (marginLado1Pct / 100);
 
     if (marginLado1Pct >= BOT_CONFIG.minProfitMarginPct) {
+      // Guardar oportunidad en D1 (tabla arbitrage_opportunities)
+      await persistArbitrageOpportunity(db, {
+        blockNumber: bn,
+        route: "LADO_1",
+        currency: "VES",
+        contractBuyPrice,
+        contractSellPrice,
+        binanceBuyPrice,
+        binanceSellPrice,
+        spreadGross: spreadLado1,
+        marginPct: marginLado1Pct,
+        profitUsdc: profitLado1Usdc,
+        blockTimestampIso: tsIso,
+      }).catch(console.error);
+
       if (now - lastAlertTimeLado1 >= BOT_CONFIG.alertCooldownMs) {
         lastAlertTimeLado1 = now;
 
@@ -50,7 +74,7 @@ export async function checkArbitrageForBlock(
           `⚡ <b>Margen Neto:</b> +${marginLado1Pct.toFixed(2)}%\n\n` +
           `💵 <b>Ganancia Proyectada ($${BOT_CONFIG.simulatedTradeUsdc} USDC):</b> +$${profitLado1Usdc.toFixed(2)} USDC`;
 
-        console.log(`\n🚨 ¡ALERTA LADO 1! Enviando notificación a Telegram... (Bloque ${bn})`);
+        console.log(`\n🚨 ¡ALERTA LADO 1! Enviando notificación a Telegram y guardando en D1... (Bloque ${bn})`);
         await sendTelegramAlert(msgHtml);
       }
     }
@@ -63,6 +87,21 @@ export async function checkArbitrageForBlock(
     const profitLado2Usdc = BOT_CONFIG.simulatedTradeUsdc * (marginLado2Pct / 100);
 
     if (marginLado2Pct >= BOT_CONFIG.minProfitMarginPct) {
+      // Guardar oportunidad en D1 (tabla arbitrage_opportunities)
+      await persistArbitrageOpportunity(db, {
+        blockNumber: bn,
+        route: "LADO_2",
+        currency: "VES",
+        contractBuyPrice,
+        contractSellPrice,
+        binanceBuyPrice,
+        binanceSellPrice,
+        spreadGross: spreadLado2,
+        marginPct: marginLado2Pct,
+        profitUsdc: profitLado2Usdc,
+        blockTimestampIso: tsIso,
+      }).catch(console.error);
+
       if (now - lastAlertTimeLado2 >= BOT_CONFIG.alertCooldownMs) {
         lastAlertTimeLado2 = now;
 
@@ -76,7 +115,7 @@ export async function checkArbitrageForBlock(
           `⚡ <b>Margen Neto:</b> +${marginLado2Pct.toFixed(2)}%\n\n` +
           `💵 <b>Ganancia Proyectada ($${BOT_CONFIG.simulatedTradeUsdc} USDC):</b> +$${profitLado2Usdc.toFixed(2)} USDC`;
 
-        console.log(`\n🚨 ¡ALERTA LADO 2! Enviando notificación a Telegram... (Bloque ${bn})`);
+        console.log(`\n🚨 ¡ALERTA LADO 2! Enviando notificación a Telegram y guardando en D1... (Bloque ${bn})`);
         await sendTelegramAlert(msgHtml);
       }
     }
@@ -96,13 +135,16 @@ export async function checkArbitrageForBlock(
  * Modo autónomo (standalone): Monitorea consultando la blockchain periódicamente.
  */
 export async function startArbitrageMonitor() {
+  startTelegramCommandListener();
+
   console.log("=================================================================");
-  console.log("🚀 BOT DE ARBITRAJE P2P — MONITOREO Y NOTIFICACIONES TELEGRAM");
+  console.log("🚀 BOT DE ARBITRAJE P2P — MONITOREO, TELEGRAM Y GUARDADO EN D1");
   console.log("   - Red Blockchain: Base Mainnet");
   console.log("   - Par de Comercio: VES / USDC");
   console.log("   - Monto Simulado por Operación: $" + BOT_CONFIG.simulatedTradeUsdc + " USDC");
   console.log("   - Umbral de Alerta: > " + BOT_CONFIG.minProfitMarginPct + "% de ganancia neta");
   console.log("   - Notificación Telegram: " + (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID ? "ACTIVADA 📲" : "CONFIGURACIÓN PENDIENTE ⚠️ (.env)"));
+  console.log("   - Persistencia D1: TABLA `arbitrage_opportunities` ACTIVADA 💾");
   console.log("   - Logs Continuos de Consola: " + (BOT_CONFIG.silentConsoleLogs ? "SILENCIADOS 🔇 (Solo alertas)" : "ACTIVADOS 🔊"));
   console.log("=================================================================\n");
 

@@ -5,6 +5,9 @@ import { persistEvent } from "../shared/db/store";
 import { getLastBlock, setLastBlock } from "../shared/db/state";
 import { persistBlockPrices } from "../shared/db/price-store";
 import { checkArbitrageForBlock } from "../arbitrage-bot/monitor";
+import { startTelegramCommandListener } from "../arbitrage-bot/telegram";
+
+startTelegramCommandListener();
 import { fastCatchup } from "./catchup";
 import { createClient, RPC_URLS } from "../shared/rpc-config";
 import { getCloudflareEnv } from "../shared/env";
@@ -75,8 +78,8 @@ async function main() {
           blockTimestampUnix,
         );
 
-        // Evaluar arbitraje en tiempo real reutilizando los precios en memoria (0 RPCs extra)
-        checkArbitrageForBlock(blockNumber, prices[0].buyPrice, prices[0].sellPrice).catch(console.error);
+        // Evaluar arbitraje en tiempo real reutilizando los precios en memoria (0 RPCs extra) y guardar oportunidad en D1
+        checkArbitrageForBlock(blockNumber, prices[0].buyPrice, prices[0].sellPrice, db, blockTimestampIso).catch(console.error);
       }
     } catch (err) {
       console.error(

@@ -92,6 +92,29 @@ export const blockPrices = sqliteTable("block_prices", {
     .on(table.currency),
 }));
 
+export const arbitrageOpportunities = sqliteTable("arbitrage_opportunities", {
+  id: text("id").primaryKey(),
+  blockNumber: integer("block_number").notNull(),
+  route: text("route").notNull(), // "LADO_1" | "LADO_2"
+  currency: text("currency").notNull().default("VES"),
+  contractBuyPrice: real("contract_buy_price").notNull(),
+  contractSellPrice: real("contract_sell_price").notNull(),
+  binanceBuyPrice: real("binance_buy_price").notNull(),
+  binanceSellPrice: real("binance_sell_price").notNull(),
+  spreadGross: real("spread_gross").notNull(),
+  marginPct: real("margin_pct").notNull(),
+  profitUsdc: real("profit_usdc").notNull(),
+  blockTimestampIso: text("block_timestamp_iso").notNull().default(""),
+  createdAt: text("created_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
+}, (table) => ({
+  blockRouteUnique: uniqueIndex("idx_opps_block_route")
+    .on(table.blockNumber, table.route),
+  marginPctIdx: index("idx_opps_margin_pct")
+    .on(table.marginPct),
+}));
+
 export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;
 export type OrderEvent = typeof orderEvents.$inferSelect;
@@ -99,3 +122,5 @@ export type NewOrderEvent = typeof orderEvents.$inferInsert;
 export type ProcessorState = typeof processorState.$inferSelect;
 export type BlockPrice = typeof blockPrices.$inferSelect;
 export type NewBlockPrice = typeof blockPrices.$inferInsert;
+export type ArbitrageOpportunity = typeof arbitrageOpportunities.$inferSelect;
+export type NewArbitrageOpportunity = typeof arbitrageOpportunities.$inferInsert;

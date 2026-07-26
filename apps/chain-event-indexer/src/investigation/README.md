@@ -1,21 +1,22 @@
 # 📁 Investigación y Análisis On-Chain — chain-event-indexer
 
-Esta carpeta dentro de `apps/chain-event-indexer/` organiza la documentación, análisis de datos, trazas de blockchain y reportes sobre el comportamiento de precios y arbitraje en el contrato Diamond de **Base Mainnet**.
+Esta carpeta dentro de `apps/chain-event-indexer/src/` organiza la documentación, análisis de datos, trazas de blockchain y reportes sobre el comportamiento de precios, rutas de dinero y arbitraje en el contrato Diamond de **Base Mainnet**.
 
 ---
 
 ## 📄 Documentos de Investigación
 
-- [RESEARCH_REPORT.md](RESEARCH_REPORT.md): Reporte completo con direcciones identificadas, money trail (Binance Hot Wallet), hallazgos del bot explorador y caso de estudio bloque por bloque.
+- [WEEKLY_ARBITRAGE_REPORT.md](WEEKLY_ARBITRAGE_REPORT.md): **Informe Completo de la Semana (19-26 Julio)**. Incluye las Top 15 Billeteras, horarios pico de operación (UTC vs VET), Money Trail detallado hacia Binance Hot Wallet 2, y análisis de la red de bots exploradores (Lado 1 y Lado 2).
+- [RESEARCH_REPORT.md](RESEARCH_REPORT.md): Reporte inicial con direcciones identificadas, money trail y caso de estudio bloque por bloque.
 
 ---
 
-## 🛠️ Ubicación de los Scripts de Investigación (`src/local/`)
-
-Todos los scripts de investigación ejecutables se encuentran dentro de `apps/chain-event-indexer/src/local/`:
+## 🛠️ Ubicación de los Scripts de Investigación (`src/investigation/scripts/`)
 
 | Script | Descripción |
 |--------|-------------|
+| `trace-all-top-wallets.ts` | Rastrea horarios pico de operación y rutas on-chain completas (hacia/desde Binance Hot Wallet 2) de las Top Billeteras. |
+| `analyze-full-week.ts` | Filtra y analiza todas las órdenes de la semana o del histórico en D1. |
 | `fill-prices.ts` | Rellena precios bloque por bloque en D1 para cualquier rango histórico. |
 | `inspect-transactions.ts` | Muestra órdenes y eventos con el precio exacto de cada bloque. |
 | `check-user-arbitrage.ts` | Analiza el historial completo de una dirección en la DB. |
