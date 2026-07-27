@@ -39,7 +39,7 @@ export const BOT_CONFIG = {
   // Umbral mínimo de ganancia neta (%) para enviar notificación a Telegram
   minProfitMarginPct: process.env.MIN_PROFIT_MARGIN_PCT
     ? parseFloat(process.env.MIN_PROFIT_MARGIN_PCT)
-    : 0.0,
+    : 1,
   simulatedTradeUsdc: process.env.SIMULATED_TRADE_USDC
     ? parseFloat(process.env.SIMULATED_TRADE_USDC)
     : 250,
